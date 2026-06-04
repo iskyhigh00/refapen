@@ -1,8 +1,188 @@
 const accSel = {};
 
+function mostrarOverlayCambio(acc, callback) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:360px";
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  function paso1() {
+    box.innerHTML = `
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(acc)}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:20px">¿La pieza es nueva o usada?</div>
+      <button class="btn btn-ok" style="margin-top:0">Nueva</button>
+      <button class="btn btn-sec" style="margin-top:10px">Usada</button>
+      <button class="btn btn-sec" style="margin-top:10px;font-size:13px;color:var(--muted)">Cancelar</button>`;
+    const btns = box.querySelectorAll("button");
+    btns[0].onclick = () => { overlay.remove(); callback(acc + " (nueva)"); };
+    btns[1].onclick = paso2;
+    btns[2].onclick = () => overlay.remove();
+  }
+
+  function paso2() {
+    box.innerHTML = `
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(acc)}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:20px">¿La pieza usada está probada o es dudosa?</div>
+      <button class="btn" style="margin-top:0;background:var(--ok);color:#fff">Probada</button>
+      <button class="btn btn-danger" style="margin-top:10px">Dudosa</button>
+      <button class="btn btn-sec" style="margin-top:10px;font-size:13px;color:var(--muted)">Cancelar</button>`;
+    const btns = box.querySelectorAll("button");
+    btns[0].onclick = () => { overlay.remove(); callback(acc + " (usada - probada)"); };
+    btns[1].onclick = () => { overlay.remove(); callback(acc + " (usada - dudosa)"); };
+    btns[2].onclick = () => overlay.remove();
+  }
+
+  paso1();
+}
+
+function mostrarOverlayFirmware(acc, callback) {
+  const key = "fw_versions_" + acc;
+  const versiones = JSON.parse(localStorage.getItem(key) || "[]");
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:360px";
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  function pintar() {
+    let html = `
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(acc)}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">¿Qué versión?</div>`;
+    versiones.forEach(v => {
+      html += `<button class="btn btn-sec fw-ver" style="margin-top:8px">${esc(v)}</button>`;
+    });
+    html += `
+      <input type="text" id="fwNuevaVer" placeholder="Escribir nueva versión…" style="margin-top:12px">
+      <button class="btn btn-ok" id="fwGuardar" style="margin-top:10px">Guardar</button>
+      <button class="btn btn-sec" id="fwCancelar" style="margin-top:10px;font-size:13px;color:var(--muted)">Cancelar</button>`;
+    box.innerHTML = html;
+
+    box.querySelectorAll(".fw-ver").forEach(b => {
+      b.onclick = () => { overlay.remove(); callback(acc + " (" + b.textContent + ")"); };
+    });
+    box.querySelector("#fwGuardar").onclick = () => {
+      const ver = box.querySelector("#fwNuevaVer").value.trim();
+      if (!ver) { toast("Escribe una versión"); return; }
+      if (!versiones.includes(ver)) {
+        versiones.push(ver);
+        localStorage.setItem(key, JSON.stringify(versiones));
+      }
+      overlay.remove();
+      callback(acc + " (" + ver + ")");
+    };
+    box.querySelector("#fwCancelar").onclick = () => overlay.remove();
+  }
+
+  pintar();
+}
+
+// — Fotos —
+
+async function comprimirImagen(file, maxAncho = 1200) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxAncho) { h = h * maxAncho / w; w = maxAncho; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob), "image/jpeg", 0.8);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function subirFoto(fallaId, file) {
+  toast("Subiendo foto…");
+  const blob = await comprimirImagen(file);
+  const path = `${fallaId}/${Date.now()}.jpg`;
+  const { error } = await sb.storage.from("fotos").upload(path, blob, { contentType: "image/jpeg" });
+  if (error) {
+    if (error.message?.includes("not found") || error.statusCode === 404) {
+      toast("Crea el bucket 'fotos' en Supabase Storage");
+    } else {
+      toast("Error: " + error.message);
+    }
+    return;
+  }
+  audit("subir_foto", { falla_id: fallaId });
+  toast("Foto guardada");
+  cargarFotos(fallaId);
+}
+
+async function cargarFotos(fallaId) {
+  const grid = document.querySelector(`[data-fotos="${fallaId}"]`);
+  if (!grid) return;
+  try {
+    const { data, error } = await sb.storage.from("fotos").list(String(fallaId), { sortBy: { column: "created_at", order: "desc" } });
+    const fotos = (data || []).filter(f => f.name && !f.name.startsWith(".") && f.metadata);
+    if (error || !fotos.length) { grid.innerHTML = ""; return; }
+    grid.innerHTML = "";
+    const urls = fotos.map(f => sb.storage.from("fotos").getPublicUrl(`${fallaId}/${f.name}`).data.publicUrl);
+    fotos.forEach((f, idx) => {
+      const img = document.createElement("img");
+      img.src = urls[idx];
+      img.className = "foto-thumb";
+      img.onclick = ev => { ev.stopPropagation(); abrirGaleria(urls, idx); };
+      grid.appendChild(img);
+    });
+  } catch (e) {
+    grid.innerHTML = "";
+  }
+}
+
+function abrirGaleria(urls, index) {
+  let actual = index;
+  const ov = document.createElement("div");
+  ov.className = "foto-overlay";
+  ov.innerHTML = `
+    <button class="gal-btn gal-prev">‹</button>
+    <img src="${urls[actual]}">
+    <button class="gal-btn gal-next">›</button>
+    <div class="gal-counter">${actual + 1} / ${urls.length}</div>
+    <button class="gal-close">✕</button>`;
+  document.body.appendChild(ov);
+
+  const img = ov.querySelector("img");
+  const counter = ov.querySelector(".gal-counter");
+  const prev = ov.querySelector(".gal-prev");
+  const next = ov.querySelector(".gal-next");
+
+  function mostrar() {
+    img.src = urls[actual];
+    counter.textContent = `${actual + 1} / ${urls.length}`;
+    prev.style.visibility = actual > 0 ? "visible" : "hidden";
+    next.style.visibility = actual < urls.length - 1 ? "visible" : "hidden";
+  }
+
+  prev.onclick = e => { e.stopPropagation(); actual--; mostrar(); };
+  next.onclick = e => { e.stopPropagation(); actual++; mostrar(); };
+  ov.querySelector(".gal-close").onclick = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+
+  // Swipe táctil
+  let startX = 0;
+  ov.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
+  ov.addEventListener("touchend", e => {
+    const diff = e.changedTouches[0].clientX - startX;
+    if (diff > 60 && actual > 0) { actual--; mostrar(); }
+    else if (diff < -60 && actual < urls.length - 1) { actual++; mostrar(); }
+  });
+
+  mostrar();
+}
+
 async function abrirMda(mdaNum) {
-  $("scrMda").classList.remove("hidden");
+  abrirPantalla("scrMda");
   $("mdaTitulo").textContent = "MDA " + mdaNum;
+  $("mdaTecBadge").textContent = tecnico;
   $("mdaBody").innerHTML = "<p style='color:var(--muted)'>Cargando…</p>";
   audit("abrir_mda", { mda: mdaNum });
 
@@ -14,15 +194,83 @@ async function abrirMda(mdaNum) {
     fallas = JSON.parse(localStorage.getItem("cache_fallas") || "[]").filter(f => f.mda === mdaNum);
   }
 
+  // Mostrar isla en el título
+  if (fallas.length && fallas[0].isla) {
+    $("mdaTitulo").textContent = "MDA " + mdaNum + " · isla " + fallas[0].isla;
+  }
+
   const body = $("mdaBody");
   body.innerHTML = "";
-  for (const f of fallas) {
+
+  // Separar activas y resueltas
+  const activas = fallas.filter(f => f.estado !== "resuelta");
+  const resueltas = fallas.filter(f => f.estado === "resuelta");
+
+  // Fallas activas
+  if (!activas.length && !resueltas.length) {
+    body.innerHTML = '<p style="color:var(--muted)">Sin fallas registradas para esta MDA.</p>';
+    return;
+  }
+
+  for (const f of activas) {
     let acciones = [];
     if (navigator.onLine) {
       const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
       acciones = data || [];
     }
     body.appendChild(renderFalla(f, acciones));
+  }
+
+  // Historial de esta máquina
+  if (resueltas.length) {
+    const secHist = document.createElement("div");
+    secHist.style.cssText = "margin-top:20px;border-top:2px solid var(--border);padding-top:16px";
+
+    const toggle = document.createElement("div");
+    toggle.style.cssText = "display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0";
+    toggle.innerHTML = `<span style="font-size:15px;font-weight:700;color:var(--muted)">Historial de esta máquina (${resueltas.length})</span><span class="arr" style="color:var(--muted);transition:.2s;font-size:18px">›</span>`;
+
+    const contenido = document.createElement("div");
+    contenido.style.display = "none";
+
+    toggle.onclick = async () => {
+      const abierto = contenido.style.display !== "none";
+      contenido.style.display = abierto ? "none" : "block";
+      toggle.querySelector(".arr").style.transform = abierto ? "" : "rotate(90deg)";
+      // Cargar contenido la primera vez
+      if (!abierto && !contenido.dataset.loaded) {
+        contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Cargando historial…</p>';
+        contenido.dataset.loaded = "1";
+        contenido.innerHTML = "";
+        for (const f of resueltas) {
+          let acciones = [];
+          if (navigator.onLine) {
+            const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
+            acciones = data || [];
+          }
+          // Resumen compacto
+          const card = document.createElement("div");
+          card.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;opacity:.85";
+          let accsHtml = acciones.filter(a => !a.anulada).map(a => {
+            const tag = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
+            return `<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between"><span>${esc(a.accion)}</span><span style="color:${tag};font-weight:700;font-size:11px">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span></div>`;
+          }).join("");
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+              <div><b style="font-size:14px">${esc(f.falla)}</b><div style="font-size:11px;color:var(--muted)">${f.tecnico} · ${fmtFecha(f.created_at)}</div></div>
+              <span class="estado-tag estado-resuelta" style="font-size:10px">Resuelta</span>
+            </div>
+            ${accsHtml || '<div style="font-size:12px;color:var(--muted)">Sin acciones registradas</div>'}
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">Resuelta el ${fmtFecha(f.updated_at)}</div>`;
+          contenido.appendChild(card);
+        }
+        if (!resueltas.length) contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin historial previo.</p>';
+      }
+    };
+
+    secHist.appendChild(toggle);
+    secHist.appendChild(contenido);
+    body.appendChild(secHist);
   }
 }
 
@@ -32,33 +280,55 @@ function renderFalla(f, acciones) {
   const cerrada = f.estado === "resuelta";
   const estLabel = { pendiente: "Pendiente", observacion: "En observación", resuelta: "Resuelta" }[f.estado] || f.estado;
 
-  let accHtml = "";
-  acciones.forEach(a => {
+  const accsRev = [...acciones].reverse();
+  const recientes = accsRev.slice(0, 3);
+  const antiguas = accsRev.slice(3);
+
+  function renderAccItem(a) {
+    const resText = a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "sugerencia pendiente";
     const hist = a.historial_resultados
-      ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
+      ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${resText} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
     const clickable = (!a.anulada && a.resultado === "pendiente") ? `style="cursor:pointer" data-resolve="${a.id}" data-accion="${esc(a.accion)}"` : "";
-    accHtml += `<div class="accion-item${a.anulada ? ' anulada' : ''}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span></div><div class="accion-meta">${a.tecnico} · ${fmtFecha(a.created_at)}</div>${hist}</div>`;
-  });
+    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span></div>${hist}</div>`;
+  }
+
+  let accHtml = recientes.map(renderAccItem).join("");
+  if (antiguas.length) {
+    accHtml += `<div class="ver-mas-acc" data-vermas="${f.id}" style="text-align:center;padding:8px;color:var(--accent);font-size:13px;cursor:pointer;border-top:1px solid var(--border)">Ver ${antiguas.length} anteriores ▾</div>`;
+    accHtml += `<div class="acc-antiguas hidden" data-antiguas="${f.id}">${antiguas.map(renderAccItem).join("")}</div>`;
+  }
 
   div.innerHTML = `
-    <h3>${esc(f.falla)}</h3>
-    <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span></div>
+    <h3 style="font-size:20px;margin-bottom:6px">${esc(f.falla)}</h3>
+    <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
     <div class="acciones-list">${accHtml || '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>'}</div>
+    <div style="margin-top:10px">
+      <div class="fotos-grid" data-fotos="${f.id}"></div>
+      ${!cerrada ? `<label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">📷 Agregar foto<input type="file" accept="image/*" capture="environment" data-fotoinput="${f.id}" style="display:none"></label>` : ""}
+    </div>
     ${cerrada ? "" : `
     <div class="add-accion">
-      <label style="margin-top:0">Registrar lo que hice</label>
-      <div id="selacc-${f.id}" class="sel-accion hidden"></div>
-      <div class="reg-arriba hidden" data-regarriba="${f.id}">
-        <div class="seg res" data-resseg="${f.id}">
-          <button class="on" data-v="resolvio">Resolvió</button>
-          <button data-v="no_resolvio">No resolvió</button>
-          <button data-v="pendiente">Pendiente</button>
-        </div>
-        <button class="btn btn-ok" data-addacc="${f.id}" style="margin-top:10px">Guardar acciones</button>
+      <div class="add-accion-toggle" data-toggle-acc="${f.id}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <label style="margin:0;cursor:pointer;pointer-events:none">+ Registrar acción o sugerencia</label>
+        <span class="arr" style="color:var(--muted);transition:.2s;font-size:18px">›</span>
       </div>
-      <input class="acc-search" placeholder="Buscar acción…" data-search="${f.id}" style="margin-bottom:10px">
-      <div class="chips" data-chips="${f.id}"></div>
-      <div data-cats="${f.id}"></div>
+      <div class="add-accion-body hidden" data-accbody="${f.id}">
+        <div style="margin:10px 0 14px">
+          <label style="margin:0 0 6px;font-size:12px">¿Qué estás registrando?</label>
+          <div class="seg res" data-resseg="${f.id}">
+            <button class="on" data-v="resolvio">Lo hice ✓</button>
+            <button data-v="no_resolvio">No funcionó ✗</button>
+            <button data-v="pendiente">Sugiero →</button>
+          </div>
+        </div>
+        <div id="selacc-${f.id}" class="sel-accion hidden"></div>
+        <div class="reg-arriba hidden" data-regarriba="${f.id}">
+          <button class="btn btn-ok" data-addacc="${f.id}" style="margin-top:10px">Guardar</button>
+        </div>
+        <input class="acc-search" placeholder="Buscar acción…" data-search="${f.id}" style="margin-bottom:10px">
+        <div class="chips" data-chips="${f.id}"></div>
+        <div data-cats="${f.id}"></div>
+      </div>
     </div>`}
   `;
 
@@ -69,11 +339,35 @@ function renderFalla(f, acciones) {
     });
   });
 
+  // Toggle de "Registrar lo que hice"
+  const toggleAcc = div.querySelector("[data-toggle-acc='" + f.id + "']");
+  const bodyAcc = div.querySelector("[data-accbody='" + f.id + "']");
+  if (toggleAcc && bodyAcc) {
+    toggleAcc.onclick = () => {
+      const abierto = !bodyAcc.classList.contains("hidden");
+      bodyAcc.classList.toggle("hidden");
+      toggleAcc.querySelector(".arr").style.transform = abierto ? "" : "rotate(90deg)";
+    };
+  }
+  // Ver más acciones antiguas
+  const verMas = div.querySelector("[data-vermas='" + f.id + "']");
+  const divAntiguas = div.querySelector("[data-antiguas='" + f.id + "']");
+  if (verMas && divAntiguas) {
+    verMas.onclick = () => {
+      const abierto = !divAntiguas.classList.contains("hidden");
+      divAntiguas.classList.toggle("hidden");
+      verMas.textContent = abierto ? `Ver ${antiguas.length} anteriores ▾` : "Ocultar anteriores ▴";
+    };
+  }
   if (!cerrada) initSelectorAcciones(div, f.id, acciones);
   div.querySelector("[data-addacc='" + f.id + "']")?.addEventListener("click", () => addAccion(f.id));
   div.querySelectorAll("[data-resolve]").forEach(el => el.addEventListener("click", () => {
     resolverAccionPendiente(el.dataset.resolve, el.dataset.accion, f.id);
   }));
+  // Fotos
+  const fotoInput = div.querySelector("[data-fotoinput='" + f.id + "']");
+  if (fotoInput) fotoInput.onchange = e => { const file = e.target.files[0]; if (file) subirFoto(f.id, file); };
+  if (navigator.onLine) cargarFotos(f.id);
   return div;
 }
 
@@ -94,15 +388,32 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
     selBox.querySelectorAll("[data-rm]").forEach(x => x.onclick = () => { accSel[fid] = accSel[fid].filter(a => a !== x.dataset.rm); render(); });
   }
 
-  function elegir(acc) {
+  function agregarAcc(acc) {
     accSel[fid] = accSel[fid] || [];
     if (!accSel[fid].includes(acc)) accSel[fid].push(acc);
     render();
     selBox.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function elegir(acc) {
+    // Si es sugerencia, agregar directo sin preguntas de detalle
+    const resSel = div.querySelector("[data-resseg='" + fid + "'] button.on")?.dataset.v;
+    if (resSel !== "pendiente") {
+      if (/cambio|intercambio/i.test(acc)) {
+        mostrarOverlayCambio(acc, agregarAcc);
+        return;
+      }
+      if (/firmware|variant/i.test(acc)) {
+        mostrarOverlayFirmware(acc, agregarAcc);
+        return;
+      }
+    }
+    agregarAcc(acc);
+  }
+
   chips.innerHTML = "";
-  FAVS.forEach(a => {
+  const favs = TOP_ACCIONES.length ? TOP_ACCIONES : FAVS;
+  favs.forEach(a => {
     if (!TODAS.includes(a)) return;
     const c = document.createElement("button");
     c.className = "chip fav";
@@ -118,11 +429,15 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
       const res = TODAS.filter(a => a.toLowerCase().includes(q));
       if (!res.length) {
         cats.innerHTML = '<div class="no-res">Sin coincidencias</div>';
-        const btn = document.createElement("button");
-        btn.className = "add-nueva-acc";
-        btn.textContent = `+ Agregar "${filtro}" al catálogo`;
-        btn.onclick = () => agregarAlCatalogo(filtro, fid, elegir);
-        cats.appendChild(btn);
+        const tecData = TECNICOS_DATA.find(t => t.nombre === tecnico);
+        const puedeSugerir = isObrist || (tecData && tecData.puede_sugerir === true);
+        if (puedeSugerir) {
+          const btn = document.createElement("button");
+          btn.className = "add-nueva-acc";
+          btn.textContent = `+ Agregar "${filtro}" al catálogo`;
+          btn.onclick = () => agregarAlCatalogo(filtro, fid, elegir);
+          cats.appendChild(btn);
+        }
         return;
       }
       const box = document.createElement("div");
@@ -152,8 +467,9 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
 }
 
 async function agregarAlCatalogo(nombre, fid, elegirFn) {
-  const cat = prompt("¿A qué categoría pertenece?\n" + Object.keys(ACCIONES).join("\n"));
-  if (!cat || !Object.keys(ACCIONES).hasOwnProperty(cat)) { toast("Categoría inválida"); return; }
+  const cats = Object.keys(ACCIONES);
+  const cat = await preguntar("¿A qué categoría pertenece?<br><span style='font-size:12px;color:var(--muted)'>" + cats.join(", ") + "</span>");
+  if (!cat || !cats.includes(cat)) { toast("Categoría inválida"); return; }
   const { error } = await sb.from("catalogo_acciones").insert({ categoria: cat, accion: nombre, activa: true });
   if (error) { toast("Error al agregar"); return; }
   audit("agregar_accion_catalogo", { accion: nombre, categoria: cat });
@@ -172,7 +488,7 @@ async function addAccion(fallaId) {
     const { data } = await sb.from("acciones").select("*").eq("falla_id", fallaId);
     existentes = (data || []).filter(a => !a.anulada);
   }
-  const resLabel = { resolvio: "resolvió", no_resolvio: "no resolvió", pendiente: "pendiente" };
+  const resLabel = { resolvio: "resolvió", no_resolvio: "no resolvió", pendiente: "sugerencia" };
   for (const txt of sel) {
     const prev = existentes.find(a => a.accion === txt);
     if (prev && navigator.onLine) {
@@ -194,10 +510,19 @@ async function addAccion(fallaId) {
   if (navigator.onLine) { await sb.from("mdas_fallas").update(upd).eq("id", fallaId); }
   else if (nuevoEstado) { cola.push({ t: "estado", d: { id: fallaId, estado: nuevoEstado } }); guardarCola(); }
 
+  // Sumar al contador permanente de uso
+  if (navigator.onLine) {
+    for (const txt of sel) {
+      const base = txt.replace(/\s*\(nueva\)|\s*\(usada.*?\)|\s*\([^)]*\)$/gi, "").trim();
+      await sb.rpc("incrementar_uso", { nombre: base });
+    }
+  }
+
   audit("registrar_acciones", { falla_id: fallaId, acciones: sel, resultado: res, nuevo_estado: nuevoEstado });
   accSel[fallaId] = [];
   toast(nuevoEstado === "observacion" ? "Registrado · en observación" : "Registrado");
   const mda = $("mdaTitulo").textContent.replace("MDA ", "");
+  await cargarMaestros();
   abrirMda(mda);
 }
 
@@ -219,7 +544,10 @@ function resolverAccionPendiente(accionId, nombre, fallaId) {
   async function aplicar(res) {
     overlay.remove();
     const ts = new Date().toISOString();
-    const rastro = `pendiente (${tecnico} · ${fmtFecha(ts)})`;
+    // Obtener datos originales para preservar quién sugirió
+    const { data: orig } = await sb.from("acciones").select("*").eq("id", accionId).single();
+    const resLabelOrig = { resolvio: "resolvió", no_resolvio: "no resolvió", pendiente: "sugerencia" };
+    const rastro = (orig?.historial_resultados ? orig.historial_resultados + " → " : "") + `${resLabelOrig[orig?.resultado] || "sugerencia"} (${orig?.tecnico} · ${fmtFecha(orig?.created_at)})`;
     await sb.from("acciones").update({ resultado: res, tecnico, created_at: ts, historial_resultados: rastro }).eq("id", accionId);
     let nuevoEstado = res === "resolvio" ? "observacion" : res === "no_resolvio" ? "pendiente" : null;
     if (nuevoEstado) await sb.from("mdas_fallas").update({ estado: nuevoEstado, updated_at: ts }).eq("id", fallaId);
