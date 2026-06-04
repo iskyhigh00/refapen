@@ -16,7 +16,7 @@ async function cargarHistorial() {
       <div style="font-size:12px;color:var(--muted);margin-top:4px">Resuelta por ${esc(f.tecnico)}</div>
       <button class="volvio-btn" data-volvio="${f.id}" style="margin-left:0;width:100%;margin-top:10px">⟲ Volvió a fallar</button>`;
     card.querySelector("[data-volvio='" + f.id + "']").onclick = async () => {
-      if (!confirm("¿Reabrir como pendiente?")) return;
+      if (!await confirmar("¿Reabrir como pendiente?", { ok: "Reabrir", danger: true })) return;
       await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: new Date().toISOString() }).eq("id", f.id);
       audit("reabrir_falla", { falla_id: f.id, mda: f.mda });
       toast("Reabierta");

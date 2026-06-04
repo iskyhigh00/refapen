@@ -1,72 +1,98 @@
 let tecnico = localStorage.getItem("tecnico_fallas") || null;
-let isObrist = tecnico?.toLowerCase() === "obrist";
+let isObrist = tecnico?.toLowerCase() === "ricardo obrist";
 
-function mostrarObrist() {
-  const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center";
-  const SEQ = [2, 0, 4, 1, 3];
+const SECRET_SEQ = [2, 0, 4, 1, 3];
+
+function mostrarCarga(tecSeleccionado) {
+  // Deshabilitar botones mientras "carga"
+  document.querySelectorAll(".tec-btn").forEach(b => { b.disabled = true; b.style.opacity = ".5"; });
+
+  const loader = document.createElement("div");
+  loader.style.cssText = "display:flex;gap:16px;justify-content:center;padding:24px 0 8px";
+  loader.id = "loaderDots";
+
   let prog = 0;
-  let timer = null;
+  let completado = false;
+  let animFrame = 0;
+  let tiempoRestante = 2000;
+  let ultimoTick = Date.now();
 
-  function resetProg() {
-    prog = 0;
-    clearTimeout(timer);
-    dots.querySelectorAll("div[data-i]").forEach(x => x.style.background = "var(--border)");
-  }
-
-  overlay.innerHTML = `
-    <div style="font-size:48px;margin-bottom:16px">🚫</div>
-    <div style="font-size:22px;font-weight:700;margin-bottom:8px">noo.. usted no es obrist, váyase.</div>
-    <div style="font-size:14px;color:var(--muted);margin-bottom:40px">Este usuario no existe en este casino.</div>
-    <div id="obristDots" style="display:flex;gap:20px;margin-bottom:32px"></div>
-    <button style="background:none;border:1px solid var(--border);color:var(--muted);padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px" id="obristCerrar">Entendido</button>`;
-  document.body.appendChild(overlay);
-
-  const dots = overlay.querySelector("#obristDots");
+  // Crear 5 dots que parecen loading
   for (let i = 0; i < 5; i++) {
     const d = document.createElement("div");
-    d.style.cssText = "width:22px;height:22px;border-radius:50%;background:var(--border);cursor:pointer;transition:.2s";
+    d.style.cssText = "width:14px;height:14px;border-radius:50%;background:var(--border);transition:background .3s;cursor:default";
     d.dataset.i = i;
-    d.onclick = () => {
-      if (SEQ[prog] === i) {
-        if (prog === 0) timer = setTimeout(() => resetProg(), 3000);
+    d.onclick = e => {
+      e.stopPropagation();
+      if (completado) return;
+      if (i === 2) tiempoRestante += 2000; // centro: +2s
+      if (SECRET_SEQ[prog] === i) {
         prog++;
-        if (prog === SEQ.length) {
-          clearTimeout(timer);
-          dots.innerHTML = '<div style="font-size:28px">✓</div>';
+        tiempoRestante += 1000; // acierto: +1s
+        if (prog === SECRET_SEQ.length) {
+          completado = true;
+          clearInterval(anim);
+          clearInterval(ticker);
+          loader.querySelectorAll("div").forEach(x => x.style.background = "var(--ok)");
           setTimeout(() => {
-            overlay.remove();
-            const t = "Obrist";
-            tecnico = t; isObrist = true;
-            localStorage.setItem("tecnico_fallas", t);
-            audit("login", { tecnico: t });
+            loader.remove();
+            tecnico = "Ricardo Obrist";
+            isObrist = true;
+            localStorage.setItem("tecnico_fallas", "Ricardo Obrist");
+            audit("login", { tecnico: "Ricardo Obrist" });
             iniciar();
-          }, 600);
+          }, 400);
         }
       } else {
-        resetProg();
+        prog = 0;
       }
     };
-    dots.appendChild(d);
+    loader.appendChild(d);
   }
-  overlay.querySelector("#obristCerrar").onclick = () => overlay.remove();
+
+  $("tecGrid").after(loader);
+
+  // Animación de loading
+  const dots = loader.querySelectorAll("div");
+  const anim = setInterval(() => {
+    if (completado) return;
+    dots.forEach((d, i) => {
+      d.style.background = i === animFrame % 5 ? "var(--ok)" : "var(--border)";
+    });
+    animFrame++;
+  }, 350);
+
+  // Ticker que descuenta tiempo y hace login cuando llega a 0
+  const ticker = setInterval(() => {
+    if (completado) { clearInterval(ticker); return; }
+    const ahora = Date.now();
+    tiempoRestante -= (ahora - ultimoTick);
+    ultimoTick = ahora;
+    if (tiempoRestante <= 0) {
+      clearInterval(ticker);
+      clearInterval(anim);
+      loader.remove();
+      tecnico = tecSeleccionado;
+      isObrist = false;
+      localStorage.setItem("tecnico_fallas", tecSeleccionado);
+      audit("login", { tecnico: tecSeleccionado });
+      iniciar();
+    }
+  }, 100);
 }
 
 async function pintarLogin() {
   await cargarMaestros();
   $("tecGrid").innerHTML = "";
-  TECNICOS.forEach(t => {
+  // Remover loader previo si existe
+  const prevLoader = document.getElementById("loaderDots");
+  if (prevLoader) prevLoader.remove();
+
+  TECNICOS.filter(t => t.toLowerCase() !== "obrist" && t.toLowerCase() !== "ricardo obrist").forEach(t => {
     const b = document.createElement("button");
     b.className = "tec-btn";
     b.textContent = t;
-    b.onclick = () => {
-      if (t.toLowerCase() === "obrist") { mostrarObrist(); return; }
-      tecnico = t;
-      isObrist = t.toLowerCase() === "obrist";
-      localStorage.setItem("tecnico_fallas", t);
-      audit("login", { tecnico: t });
-      iniciar();
-    };
+    b.onclick = () => mostrarCarga(t);
     $("tecGrid").appendChild(b);
   });
 }
@@ -76,12 +102,18 @@ async function iniciar() {
   $("app").classList.remove("hidden");
   $("tecNombre").textContent = tecnico;
   if (isObrist) {
-    const btn = document.createElement("button");
-    btn.id = "btnObrist";
-    btn.textContent = "⚡ Obrist";
-    btn.style.cssText = "background:var(--danger);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700";
-    btn.onclick = () => { $("scrObrist").classList.remove("hidden"); cargarObrist(); };
-    $("btnAdmin").insertAdjacentElement("beforebegin", btn);
+    $("btnStats").classList.remove("hidden");
+    if (!document.getElementById("btnObrist")) {
+      const btn = document.createElement("button");
+      btn.id = "btnObrist";
+      btn.textContent = "Gestión";
+      btn.onclick = () => { abrirPantalla("scrObrist"); cargarObrist(); };
+      $("btnAdmin").insertAdjacentElement("beforebegin", btn);
+    }
+  } else {
+    $("btnStats").classList.add("hidden");
+    const ob = document.getElementById("btnObrist");
+    if (ob) ob.remove();
   }
   pintarSync();
   sincronizar();
