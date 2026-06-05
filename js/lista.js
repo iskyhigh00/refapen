@@ -1,4 +1,5 @@
 let sortMode = "updated"; // "updated" | "created_desc" | "created_asc"
+let filtroUrgentes = false;
 
 async function cargarLista() {
   if ($("buscarMda")) $("buscarMda").value = "";
@@ -66,17 +67,34 @@ async function cargarLista() {
     cargarLista();
   };
 
-  // Badge de urgentes en header (4+ horas pendiente)
+  // Badge de urgentes en header (2+ horas pendiente)
   const urgentes = fallas.filter(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= 2).length;
   const badge = $("urgenteBadge");
   if (urgentes > 0) {
-    badge.textContent = urgentes + " urgente" + (urgentes > 1 ? "s" : "");
+    badge.textContent = (filtroUrgentes ? "✕ " : "") + urgentes + " urgente" + (urgentes > 1 ? "s" : "");
     badge.classList.remove("hidden");
+    badge.style.cursor = "pointer";
+    badge.onclick = () => { filtroUrgentes = !filtroUrgentes; cargarLista(); };
+    if (filtroUrgentes) badge.style.outline = "2px solid var(--danger)";
+    else badge.style.outline = "";
   } else {
+    filtroUrgentes = false;
     badge.classList.add("hidden");
   }
 
-  arr.forEach(g => {
+  const arrFiltrado = filtroUrgentes
+    ? arr.filter(g => g.fallas.some(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= 2))
+    : arr;
+
+  if (filtroUrgentes) {
+    const bannerUrg = document.createElement("div");
+    bannerUrg.style.cssText = "background:var(--danger);color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;text-align:center;cursor:pointer";
+    bannerUrg.textContent = "Mostrando solo urgentes · toca para ver todas";
+    bannerUrg.onclick = () => { filtroUrgentes = false; cargarLista(); };
+    cont.appendChild(bannerUrg);
+  }
+
+  arrFiltrado.forEach(g => {
     const card = document.createElement("div");
     card.className = "mda-card";
     // Urgencia: usar la falla pendiente más vieja del grupo
@@ -130,6 +148,7 @@ async function cargarLista() {
 
 async function cambiarEstadoPortada(fallaId, estado) {
   if (estado === "resuelta") { if (!await confirmar("¿Resuelta con váucher?", { ok: "Sí, resuelta", danger: false })) return; }
+  if (estado === "observacion") { if (!await confirmar("¿Pasar a observación?", { ok: "Sí, en observación", danger: false })) return; }
   const upd = { estado, updated_at: new Date().toISOString() };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").update(upd).eq("id", fallaId);

@@ -13,10 +13,22 @@ function marcarSync(id) {
   localStorage.setItem("sync_ok", JSON.stringify(arr));
 }
 
-function pintarSync() {
+function pintarSync(sincronizando) {
   const on = navigator.onLine;
   $("netDot").className = "offline-dot" + (on ? "" : " off");
-  $("syncPill").textContent = cola.length ? ("• " + cola.length + " sin sincronizar") : "";
+  const pill = $("syncPill");
+  if (sincronizando) {
+    pill.textContent = "↑ sincronizando…";
+    pill.style.color = "var(--accent)";
+  } else if (cola.length) {
+    pill.textContent = "• " + cola.length + " pendiente" + (cola.length > 1 ? "s" : "");
+    pill.style.color = "var(--warn)";
+    pill.style.fontWeight = "700";
+  } else {
+    pill.textContent = "";
+    pill.style.color = "";
+    pill.style.fontWeight = "";
+  }
 }
 
 window.addEventListener("online", () => { pintarSync(); sincronizar(); });
@@ -24,6 +36,7 @@ window.addEventListener("offline", pintarSync);
 
 async function sincronizar() {
   if (!navigator.onLine || !cola.length) return;
+  pintarSync(true);
   const pendientes = [...cola];
   cola = [];
   guardarCola();

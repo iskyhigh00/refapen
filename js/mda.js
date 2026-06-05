@@ -1,4 +1,5 @@
 const accSel = {};
+const elegirCallbacks = {};
 
 async function buscarSugerencias(fallaTexto, fallaId) {
   if (!navigator.onLine) return [];
@@ -171,15 +172,42 @@ async function cargarSugerencias(fallaId, fallaTexto, boxDirecto) {
   if (!box) return;
   const sugs = await buscarSugerencias(fallaTexto, fallaId);
   if (!sugs.length) return;
-  box.innerHTML = `
-    <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">💡 Sugerencias basadas en fallas similares resueltas</div>
-      ${sugs.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border)">
-        <span style="font-size:13px">${esc(s.accion)}</span>
-        <span style="font-size:11px;color:var(--ok);white-space:nowrap;margin-left:8px">resolvió ${s.veces}× en ${s.enFallas} falla${s.enFallas > 1 ? "s" : ""}</span>
-      </div>`).join("")}
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">Basado en el historial de fallas similares</div>
-    </div>`;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:12px";
+  wrap.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">💡 Sugerencias basadas en fallas similares resueltas</div>`;
+  sugs.forEach(s => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);gap:8px";
+    row.innerHTML = `
+      <span style="font-size:13px;flex:1">${esc(s.accion)}</span>
+      <span style="font-size:11px;color:var(--ok);white-space:nowrap">resolvió ${s.veces}× en ${s.enFallas} falla${s.enFallas > 1 ? "s" : ""}</span>
+      <button class="btn btn-ok" style="padding:4px 10px;font-size:12px;margin:0;white-space:nowrap" data-usar="${esc(s.accion)}">Usar ▶</button>`;
+    wrap.appendChild(row);
+  });
+  const nota = document.createElement("div");
+  nota.style.cssText = "font-size:10px;color:var(--muted);margin-top:6px";
+  nota.textContent = "Basado en el historial de fallas similares";
+  wrap.appendChild(nota);
+  box.innerHTML = "";
+  box.appendChild(wrap);
+
+  wrap.querySelectorAll("[data-usar]").forEach(btn => {
+    btn.onclick = () => {
+      const acc = btn.dataset.usar;
+      const toggleEl = document.querySelector(`[data-toggle-acc="${fallaId}"]`);
+      const bodyEl = document.querySelector(`[data-accbody="${fallaId}"]`);
+      if (bodyEl && bodyEl.classList.contains("hidden")) {
+        bodyEl.classList.remove("hidden");
+        if (toggleEl) toggleEl.querySelector(".arr").style.transform = "rotate(90deg)";
+      }
+      if (elegirCallbacks[fallaId]) {
+        elegirCallbacks[fallaId](acc);
+        btn.textContent = "✓ Añadida";
+        btn.disabled = true;
+        btn.style.background = "var(--ok)";
+      }
+    };
+  });
 }
 
 async function cargarFotos(fallaId, gridDirecto) {
@@ -309,45 +337,49 @@ async function abrirMda(mdaNum) {
 
     const toggle = document.createElement("div");
     toggle.style.cssText = "display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0";
-    toggle.innerHTML = `<span style="font-size:15px;font-weight:700;color:var(--muted)">Historial de esta máquina (${resueltas.length})</span><span class="arr" style="color:var(--muted);transition:.2s;font-size:18px">›</span>`;
+    toggle.innerHTML = `<span style="font-size:15px;font-weight:700;color:var(--accent)">Historial de esta máquina (${resueltas.length})</span><span class="arr" style="color:var(--muted);transition:.2s;font-size:18px;transform:rotate(90deg)">›</span>`;
 
     const contenido = document.createElement("div");
-    contenido.style.display = "none";
+    contenido.style.display = "block";
+
+    async function cargarContenidoHistorial() {
+      if (contenido.dataset.loaded) return;
+      contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Cargando historial…</p>';
+      contenido.dataset.loaded = "1";
+      contenido.innerHTML = "";
+      for (const f of resueltas) {
+        let acciones = [];
+        if (navigator.onLine) {
+          const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
+          acciones = data || [];
+        }
+        const card = document.createElement("div");
+        card.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;opacity:.85";
+        let accsHtml = acciones.filter(a => !a.anulada).map(a => {
+          const tag = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
+          return `<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between"><span>${esc(a.accion)}</span><span style="color:${tag};font-weight:700;font-size:11px">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span></div>`;
+        }).join("");
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+            <div><b style="font-size:14px">${esc(f.falla)}</b><div style="font-size:11px;color:var(--muted)">${f.tecnico} · ${fmtFecha(f.created_at)}</div></div>
+            <span class="estado-tag estado-resuelta" style="font-size:10px">Resuelta</span>
+          </div>
+          ${accsHtml || '<div style="font-size:12px;color:var(--muted)">Sin acciones registradas</div>'}
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">Resuelta el ${fmtFecha(f.updated_at)}</div>`;
+        contenido.appendChild(card);
+      }
+      if (!resueltas.length) contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin historial previo.</p>';
+    }
 
     toggle.onclick = async () => {
       const abierto = contenido.style.display !== "none";
       contenido.style.display = abierto ? "none" : "block";
       toggle.querySelector(".arr").style.transform = abierto ? "" : "rotate(90deg)";
-      // Cargar contenido la primera vez
-      if (!abierto && !contenido.dataset.loaded) {
-        contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Cargando historial…</p>';
-        contenido.dataset.loaded = "1";
-        contenido.innerHTML = "";
-        for (const f of resueltas) {
-          let acciones = [];
-          if (navigator.onLine) {
-            const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
-            acciones = data || [];
-          }
-          // Resumen compacto
-          const card = document.createElement("div");
-          card.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;opacity:.85";
-          let accsHtml = acciones.filter(a => !a.anulada).map(a => {
-            const tag = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
-            return `<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between"><span>${esc(a.accion)}</span><span style="color:${tag};font-weight:700;font-size:11px">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span></div>`;
-          }).join("");
-          card.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-              <div><b style="font-size:14px">${esc(f.falla)}</b><div style="font-size:11px;color:var(--muted)">${f.tecnico} · ${fmtFecha(f.created_at)}</div></div>
-              <span class="estado-tag estado-resuelta" style="font-size:10px">Resuelta</span>
-            </div>
-            ${accsHtml || '<div style="font-size:12px;color:var(--muted)">Sin acciones registradas</div>'}
-            <div style="font-size:11px;color:var(--muted);margin-top:6px">Resuelta el ${fmtFecha(f.updated_at)}</div>`;
-          contenido.appendChild(card);
-        }
-        if (!resueltas.length) contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin historial previo.</p>';
-      }
+      if (!abierto) await cargarContenidoHistorial();
     };
+
+    // Cargar automáticamente al abrir
+    cargarContenidoHistorial();
 
     secHist.appendChild(toggle);
     secHist.appendChild(contenido);
@@ -361,16 +393,26 @@ function renderFalla(f, acciones) {
   const cerrada = f.estado === "resuelta";
   const estLabel = { pendiente: "Pendiente", observacion: "En observación", resuelta: "Resuelta" }[f.estado] || f.estado;
 
-  const accsRev = [...acciones].reverse();
-  const recientes = accsRev.slice(0, 3);
-  const antiguas = accsRev.slice(3);
+  const accionesNoAnuladas = acciones.filter(a => !a.anulada);
+  const pendientesDeProbar = accionesNoAnuladas.filter(a => a.resultado === "pendiente");
+  const accionesNormales = [...acciones].reverse().filter(a => a.resultado !== "pendiente");
+  const recientes = accionesNormales.slice(0, 3);
+  const antiguas = accionesNormales.slice(3);
 
   function renderAccItem(a) {
     const resText = a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "sugerencia pendiente";
     const hist = a.historial_resultados
       ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${resText} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
     const clickable = (!a.anulada && a.resultado === "pendiente") ? `style="cursor:pointer" data-resolve="${a.id}" data-accion="${esc(a.accion)}"` : "";
-    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span></div>${hist}</div>`;
+    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span>${a.resultado === "pendiente" ? ' <span style="color:var(--warn);font-size:11px">· toca para registrar resultado</span>' : ''}</div>${hist}</div>`;
+  }
+
+  let pendientesHtml = "";
+  if (pendientesDeProbar.length) {
+    pendientesHtml = `<div style="background:rgba(255,193,7,.12);border:1px solid var(--warn);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:6px">⏳ Pendiente de probar (${pendientesDeProbar.length})</div>
+      ${pendientesDeProbar.map(renderAccItem).join("")}
+    </div>`;
   }
 
   let accHtml = recientes.map(renderAccItem).join("");
@@ -383,7 +425,8 @@ function renderFalla(f, acciones) {
     <h3 style="font-size:20px;margin-bottom:6px">${esc(f.falla)}</h3>
     <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
     <div class="sugerencias-box" data-sug="${f.id}"></div>
-    <div class="acciones-list">${accHtml || '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>'}</div>
+    ${pendientesHtml}
+    <div class="acciones-list">${accHtml || (pendientesDeProbar.length ? '' : '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>')}</div>
     <div style="margin-top:10px">
       <div class="fotos-grid" data-fotos="${f.id}"></div>
       ${!cerrada ? `<label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">📷 Agregar foto<input type="file" accept="image/*" capture="environment" data-fotoinput="${f.id}" style="display:none"></label>` : ""}
@@ -545,6 +588,7 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
 
   pintarCats("");
   search.oninput = () => pintarCats(search.value);
+  elegirCallbacks[fid] = elegir;
 }
 
 async function agregarAlCatalogo(nombre, fid, elegirFn) {

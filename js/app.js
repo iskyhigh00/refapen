@@ -76,14 +76,16 @@ $("btnStats").onclick = () => navegarConWarning(() => {
   audit("abrir_stats", {});
 });
 
-// búsqueda de MDA
+// búsqueda de MDA, isla o descripción
 $("buscarMda").oninput = () => {
-  $("buscarMda").value = $("buscarMda").value.replace(/\D/g, "");
-  const q = $("buscarMda").value;
+  const q = $("buscarMda").value.toLowerCase().trim();
   const cards = document.querySelectorAll(".mda-card");
   cards.forEach(card => {
-    const texto = card.querySelector(".mda-id")?.textContent || "";
-    card.style.display = (!q || texto.includes(q)) ? "" : "none";
+    if (!q) { card.style.display = ""; return; }
+    const mdaId = (card.querySelector(".mda-id")?.textContent || "").toLowerCase();
+    const isla = (card.querySelector(".mda-isla")?.textContent || "").toLowerCase();
+    const descripciones = [...card.querySelectorAll(".falla-txt")].map(el => el.textContent.toLowerCase()).join(" ");
+    card.style.display = (mdaId.includes(q) || isla.includes(q) || descripciones.includes(q)) ? "" : "none";
   });
 };
 
@@ -139,8 +141,21 @@ $("fabNueva").onclick = () => {
   $("nMda").value = ""; $("nIsla").value = ""; $("nFalla").value = "";
   $("nMdaErr").textContent = ""; $("nIslaErr").textContent = "";
   $("nMda").style.borderColor = ""; $("nIsla").style.borderColor = "";
+  $("nFotosPreview").innerHTML = "";
+  $("nFotos").value = "";
   $("guardarFalla").disabled = true;
   abrirPantalla("scrNueva");
+};
+
+$("nFotos").onchange = () => {
+  const preview = $("nFotosPreview");
+  preview.innerHTML = "";
+  [...$("nFotos").files].forEach(file => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    img.style.cssText = "width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border)";
+    preview.appendChild(img);
+  });
 };
 $("guardarFalla").onclick = async () => {
   const mda = mda6($("nMda").value);
@@ -159,8 +174,21 @@ $("guardarFalla").onclick = async () => {
     cola.push({ id: uid(), t: "falla", d }); guardarCola();
   }
   audit("crear_falla", { mda, isla, falla });
+
+  // Subir fotos si hay
+  const archivos = [...$("nFotos").files];
+  if (archivos.length && navigator.onLine) {
+    // Necesitamos el ID de la falla recién creada
+    const { data: nueva } = await sb.from("mdas_fallas").select("id").eq("mda", mda).eq("falla", falla).order("created_at", { ascending: false }).limit(1);
+    if (nueva && nueva[0]) {
+      toast("Subiendo " + archivos.length + " foto" + (archivos.length > 1 ? "s" : "") + "…");
+      for (const file of archivos) await subirFoto(nueva[0].id, file);
+    }
+  }
+
   toast("Falla creada");
   $("scrNueva").classList.add("hidden");
+  $("nFotosPreview").innerHTML = "";
   await cargarLista();
   abrirMda(mda);
 };
