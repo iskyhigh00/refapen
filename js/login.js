@@ -108,7 +108,7 @@ async function iniciar() {
       const btn = document.createElement("button");
       btn.id = "btnObrist";
       btn.textContent = "Gestión";
-      btn.onclick = () => { abrirPantalla("scrObrist"); cargarObrist(); };
+      btn.onclick = () => navegarConWarning(() => { abrirPantalla("scrObrist"); cargarObrist(); });
       $("btnAdmin").insertAdjacentElement("beforebegin", btn);
     }
   } else {

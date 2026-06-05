@@ -55,17 +55,33 @@ async function cargarObrist() {
 
   let csvRows = [];
 
+  let csvErrores = [];
   function parsearFilas(txt) {
-    return txt.trim().split("\n").map(l => {
+    csvErrores = [];
+    return txt.trim().split("\n").map((l, i) => {
       const parts = l.split(/\t|,| {2,}/).map(s => s.trim().replace(/^"|"$/g, ""));
-      return { mda: mda6(parts[0] || ""), isla: (parts[1] || "").replace(/\D/g, "") };
-    }).filter(r => r.mda.length === 6 && r.isla);
+      const mda = mda6(parts[0] || "");
+      const isla = (parts[1] || "").replace(/\D/g, "");
+      const num = parseInt(mda);
+      if (parts.length < 2) { csvErrores.push("Fila " + (i + 1) + ": faltan columnas"); return null; }
+      if (mda.length !== 6 || isNaN(num) || num < 100000 || num > 101199) { csvErrores.push("Fila " + (i + 1) + ": MDA invalido (" + parts[0] + ")"); return null; }
+      const islaNum = parseInt(isla);
+      if (!isla || isNaN(islaNum) || islaNum < 100 || islaNum > 700) { csvErrores.push("Fila " + (i + 1) + ": Isla invalida (" + parts[1] + ")"); return null; }
+      return { mda, isla };
+    }).filter(Boolean);
   }
 
   function actualizarPreview() {
-    if (!csvRows.length) { $("csvPreview").textContent = ""; $("btnCargaMasiva").style.display = "none"; return; }
-    $("csvPreview").innerHTML = `<b>${csvRows.length} máquinas</b>: ` + csvRows.slice(0, 5).map(r => `MDA ${r.mda} isla ${r.isla}`).join(", ") + (csvRows.length > 5 ? ` y ${csvRows.length - 5} más` : "");
-    $("btnCargaMasiva").style.display = "block";
+    if (!csvRows.length && !csvErrores.length) { $("csvPreview").textContent = ""; $("btnCargaMasiva").style.display = "none"; return; }
+    let html = "";
+    if (csvRows.length) {
+      html += `<b>${csvRows.length} máquinas válidas</b>: ` + csvRows.slice(0, 5).map(r => `MDA ${r.mda} isla ${r.isla}`).join(", ") + (csvRows.length > 5 ? ` y ${csvRows.length - 5} más` : "");
+    }
+    if (csvErrores.length) {
+      html += `<div style="color:var(--danger);margin-top:6px"><b>${csvErrores.length} fila${csvErrores.length > 1 ? "s" : ""} con error:</b><br>` + csvErrores.slice(0, 5).join("<br>") + (csvErrores.length > 5 ? `<br>...y ${csvErrores.length - 5} más` : "") + "</div>";
+    }
+    $("csvPreview").innerHTML = html;
+    $("btnCargaMasiva").style.display = csvRows.length ? "block" : "none";
   }
 
   $("excelPaste").oninput = () => { csvRows = parsearFilas($("excelPaste").value); actualizarPreview(); };
@@ -87,6 +103,51 @@ async function cargarObrist() {
     toast(`${inserts.length} fallas creadas`);
     csvRows = []; $("csvPreview").textContent = ""; $("csvFalla").value = ""; $("btnCargaMasiva").style.display = "none";
     cargarLista(); cargarObrist();
+  };
+
+  // AUDITORÍA
+  const secAudit = document.createElement("div");
+  secAudit.className = "admin-section";
+  secAudit.innerHTML = `
+    <h3>Registro de auditoría</h3>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <input id="auditBuscar" placeholder="Buscar por técnico o acción…" style="margin:0;flex:1;min-width:150px">
+      <select id="auditFiltro" style="margin:0;width:auto;min-width:100px">
+        <option value="todo">Todo</option>
+        <option value="7">7 días</option>
+        <option value="30">30 días</option>
+      </select>
+      <button class="btn btn-sec btn-sm" id="btnAuditCargar" style="margin-top:0;white-space:nowrap">Cargar</button>
+    </div>
+    <div id="auditLista" style="font-size:13px;color:var(--muted)">Presiona Cargar para ver registros</div>`;
+  body.appendChild(secAudit);
+
+  $("btnAuditCargar").onclick = async () => {
+    const lista = $("auditLista");
+    lista.innerHTML = '<p style="color:var(--muted)">Cargando…</p>';
+    let query = sb.from("auditoria").select("*").order("created_at", { ascending: false }).limit(200);
+    const dias = $("auditFiltro").value;
+    if (dias !== "todo") {
+      const desde = new Date(Date.now() - parseInt(dias) * 86400000).toISOString();
+      query = query.gte("created_at", desde);
+    }
+    const { data, error } = await query;
+    if (error) { lista.innerHTML = '<p style="color:var(--danger)">Error al cargar auditoría</p>'; return; }
+    if (!data || !data.length) { lista.innerHTML = '<p style="color:var(--muted)">Sin registros</p>'; return; }
+    const q = ($("auditBuscar").value || "").toLowerCase();
+    const filtrados = q ? data.filter(r => (r.tecnico || "").toLowerCase().includes(q) || (r.accion || "").toLowerCase().includes(q)) : data;
+    if (!filtrados.length) { lista.innerHTML = '<p style="color:var(--muted)">Sin coincidencias</p>'; return; }
+    lista.innerHTML = "";
+    filtrados.forEach(r => {
+      const row = document.createElement("div");
+      row.style.cssText = "padding:8px 0;border-bottom:1px solid var(--border)";
+      let detTxt = "";
+      if (r.detalle && typeof r.detalle === "object") {
+        detTxt = Object.entries(r.detalle).map(([k, v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : v)).join(" · ");
+      }
+      row.innerHTML = `<div style="display:flex;justify-content:space-between"><b style="color:var(--accent)">${esc(r.accion)}</b><span style="font-size:11px">${fmtFecha(r.created_at)}</span></div><div style="font-size:12px">${esc(r.tecnico)}${detTxt ? ' · <span style="color:var(--muted)">' + esc(detTxt) + '</span>' : ''}</div>`;
+      lista.appendChild(row);
+    });
   };
 
   // BORRAR FALLAS
