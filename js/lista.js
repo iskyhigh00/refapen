@@ -67,8 +67,9 @@ async function cargarLista() {
     cargarLista();
   };
 
-  // Badge de urgentes en header (2+ horas pendiente)
-  const urgentes = fallas.filter(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= 2).length;
+  // Badge de urgentes en header
+  const horasUrgente = getCfg("horas_urgente", 2);
+  const urgentes = fallas.filter(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= horasUrgente).length;
   const badge = $("urgenteBadge");
   if (urgentes > 0) {
     badge.textContent = (filtroUrgentes ? "✕ " : "") + urgentes + " urgente" + (urgentes > 1 ? "s" : "");
@@ -83,7 +84,7 @@ async function cargarLista() {
   }
 
   const arrFiltrado = filtroUrgentes
-    ? arr.filter(g => g.fallas.some(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= 2))
+    ? arr.filter(g => g.fallas.some(f => f.estado === "pendiente" && horasDesde(f.updated_at) >= horasUrgente))
     : arr;
 
   if (filtroUrgentes) {
@@ -101,7 +102,7 @@ async function cargarLista() {
     const peorFalla = g.fallas.filter(f => f.estado === "pendiente").sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))[0];
     const urg = peorFalla ? urgenciaStyle(peorFalla.updated_at, peorFalla.estado) : "";
     if (urg) card.style.cssText = urg;
-    if (peorFalla && horasDesde(peorFalla.updated_at) >= 24) card.classList.add("urgente-card");
+    if (peorFalla && horasDesde(peorFalla.updated_at) >= horasUrgente * 12) card.classList.add("urgente-card");
     card.onclick = () => abrirMda(g.mda);
 
     const head = document.createElement("div");
@@ -116,7 +117,7 @@ async function cargarLista() {
       const acc = ultAcc[f.id];
       const estadoTiempo = f.estado === "observacion" ? `En observación hace ${tiempoDesde(f.updated_at)}` : f.estado === "pendiente" ? `Pendiente hace ${tiempoDesde(f.updated_at)}` : "";
       const fila = document.createElement("div");
-      const esUrgente = f.estado === "pendiente" && d >= 3;
+      const esUrgente = f.estado === "pendiente" && horasDesde(f.updated_at) >= horasUrgente;
       fila.className = "falla-mini" + (esUrgente ? " urgente" : "");
       fila.innerHTML = `
         <div class="falla-mini-top">

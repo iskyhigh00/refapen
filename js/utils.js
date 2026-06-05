@@ -1,4 +1,12 @@
-const $ = id => document.getElementById(id);
+function getCfg(key, def) {
+  const v = localStorage.getItem("cfg_" + key);
+  return v !== null ? parseFloat(v) : def;
+}
+function setCfg(key, val) {
+  localStorage.setItem("cfg_" + key, String(val));
+}
+
+
 
 function toast(m) {
   const t = document.createElement("div");
@@ -24,14 +32,13 @@ function ageTxt(d) {
   return d === 0 ? "hoy" : d === 1 ? "1 día" : d + " días";
 }
 
-// Devuelve un estilo de borde/fondo para urgencia progresiva
-// 0-4h: normal | 4-8h: rojo suave | 8-24h: rojo medio | 24h+: rojo fuerte pulsante
 function urgenciaStyle(iso, estado) {
   if (estado !== "pendiente") return "";
   const h = horasDesde(iso);
-  if (h < 2) return "";
-  if (h < 6) return "border-color:rgba(218,54,51,.4);background:rgba(218,54,51,.05)";
-  if (h < 12) return "border-color:rgba(218,54,51,.7);background:rgba(218,54,51,.1)";
+  const t = getCfg("horas_urgente", 2);
+  if (h < t) return "";
+  if (h < t * 3) return "border-color:rgba(218,54,51,.4);background:rgba(218,54,51,.05)";
+  if (h < t * 6) return "border-color:rgba(218,54,51,.7);background:rgba(218,54,51,.1)";
   return "border-color:#da3633;background:rgba(218,54,51,.18)";
 }
 

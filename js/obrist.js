@@ -4,6 +4,48 @@ async function cargarObrist() {
   const { data: fallas } = await sb.from("mdas_fallas").select("*").order("created_at", { ascending: false });
   body.innerHTML = "";
 
+  // CONFIGURACIÓN
+  const secCfg = document.createElement("div");
+  secCfg.className = "admin-section";
+  secCfg.innerHTML = `
+    <h3>Configuración</h3>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-size:14px;font-weight:600">Horas para urgente</div>
+          <div style="font-size:12px;color:var(--muted)">Una falla pendiente se marca urgente después de este tiempo</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex:none">
+          <input type="number" id="cfgHorasUrgente" min="1" max="72" value="${getCfg('horas_urgente', 2)}" style="width:64px;text-align:center;margin:0;padding:6px">
+          <span style="font-size:13px;color:var(--muted)">h</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-size:14px;font-weight:600">Mínimo de resoluciones para sugerir</div>
+          <div style="font-size:12px;color:var(--muted)">Una acción solo se sugiere si resolvió el problema esta cantidad de veces</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex:none">
+          <input type="number" id="cfgMinSug" min="1" max="20" value="${getCfg('min_sugerencias', 1)}" style="width:64px;text-align:center;margin:0;padding:6px">
+          <span style="font-size:13px;color:var(--muted)">veces</span>
+        </div>
+      </div>
+      <button class="btn btn-ok btn-sm" id="btnGuardarCfg" style="align-self:flex-end;margin-top:0">Guardar configuración</button>
+    </div>`;
+  body.appendChild(secCfg);
+
+  $("btnGuardarCfg").onclick = () => {
+    const h = parseInt($("cfgHorasUrgente").value);
+    const s = parseInt($("cfgMinSug").value);
+    if (isNaN(h) || h < 1 || h > 72) { toast("Horas inválidas (1–72)"); return; }
+    if (isNaN(s) || s < 1 || s > 20) { toast("Mínimo inválido (1–20)"); return; }
+    setCfg("horas_urgente", h);
+    setCfg("min_sugerencias", s);
+    audit("cambiar_config", { horas_urgente: h, min_sugerencias: s });
+    toast("Configuración guardada");
+    cargarLista();
+  };
+
   // TEMA
   const TEMAS = [
     { id: "oscuro", nombre: "Oscuro", bg: "#0d1117", txt: "#e6edf3", accent: "#2f81f7" },

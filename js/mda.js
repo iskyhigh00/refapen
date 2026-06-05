@@ -28,7 +28,9 @@ async function buscarSugerencias(fallaTexto, fallaId) {
     conteo[a.accion].fallas.add(a.falla_id);
   });
 
+  const minSug = getCfg("min_sugerencias", 1);
   return Object.values(conteo)
+    .filter(c => c.veces >= minSug)
     .map(c => ({ accion: c.accion, veces: c.veces, enFallas: c.fallas.size }))
     .sort((a, b) => b.veces - a.veces)
     .slice(0, 5);
