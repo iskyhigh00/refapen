@@ -645,10 +645,11 @@ async function addAccion(fallaId) {
 
   audit("registrar_acciones", { falla_id: fallaId, acciones: sel, resultado: res, nuevo_estado: nuevoEstado });
   accSel[fallaId] = [];
+  delete elegirCallbacks[fallaId];
   toast(nuevoEstado === "observacion" ? "Registrado · en observación" : "Registrado");
-  const mda = $("mdaTitulo").textContent.replace("MDA ", "");
   await cargarMaestros();
-  abrirMda(mda);
+  await cargarLista();
+  $("scrMda").classList.add("hidden");
 }
 
 function resolverAccionPendiente(accionId, nombre, fallaId) {
@@ -678,9 +679,8 @@ function resolverAccionPendiente(accionId, nombre, fallaId) {
     if (nuevoEstado) await sb.from("mdas_fallas").update({ estado: nuevoEstado, updated_at: ts }).eq("id", fallaId);
     audit("resolver_accion_pendiente", { accion_id: accionId, resultado: res, falla_id: fallaId });
     toast(nuevoEstado === "observacion" ? "Resuelto · en observación" : "Registrado");
-    const mda = $("mdaTitulo").textContent.replace("MDA ", "");
-    abrirMda(mda);
-    cargarLista();
+    await cargarLista();
+    $("scrMda").classList.add("hidden");
   }
 
   overlay.querySelector("#oRes").onclick = () => aplicar("resolvio");
