@@ -41,7 +41,7 @@ async function cargarObrist() {
   secMasiva.className = "admin-section";
   secMasiva.innerHTML = `
     <h3>Carga masiva de fallas</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">CSV con columnas: <b>mda,isla</b> — separadas por coma, sin cabecera. Se crea la misma falla para todas.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">CSV con columnas: <b>mda, isla</b> (isla acepta posición: 200, 200-01, 20001) — separadas por coma, sin cabecera. Se crea la misma falla para todas.</p>
     <textarea id="csvFalla" placeholder="pérdida de imagen en pantalla superior" style="min-height:48px;margin-bottom:8px"></textarea>
     <label style="margin-top:0;font-size:13px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">Pegar desde Excel (MDA · isla por fila)</label>
     <textarea id="excelPaste" placeholder="100011&#9;113&#10;100234&#9;045&#10;..." style="min-height:80px;margin-bottom:8px;font-family:monospace;font-size:13px"></textarea>
@@ -60,14 +60,13 @@ async function cargarObrist() {
     csvErrores = [];
     return txt.trim().split("\n").map((l, i) => {
       const parts = l.split(/\t|,| {2,}/).map(s => s.trim().replace(/^"|"$/g, ""));
-      const mda = mda6(parts[0] || "");
-      const isla = (parts[1] || "").replace(/\D/g, "");
-      const num = parseInt(mda);
       if (parts.length < 2) { csvErrores.push("Fila " + (i + 1) + ": faltan columnas"); return null; }
+      const mda = mda6(parts[0] || "");
+      const num = parseInt(mda);
       if (mda.length !== 6 || isNaN(num) || num < 100000 || num > 101199) { csvErrores.push("Fila " + (i + 1) + ": MDA invalido (" + parts[0] + ")"); return null; }
-      const islaNum = parseInt(isla);
-      if (!isla || isNaN(islaNum) || islaNum < 100 || islaNum > 700) { csvErrores.push("Fila " + (i + 1) + ": Isla invalida (" + parts[1] + ")"); return null; }
-      return { mda, isla };
+      const p = parseIsla(parts[1] || "");
+      if (!p.ok) { csvErrores.push("Fila " + (i + 1) + ": Isla invalida (" + parts[1] + ")"); return null; }
+      return { mda, isla: p.valor };
     }).filter(Boolean);
   }
 
