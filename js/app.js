@@ -90,7 +90,6 @@ $("buscarMda").oninput = () => {
 // nueva falla — validación en tiempo real
 function validarNuevaFalla() {
   const mdaRaw = $("nMda").value.replace(/\D/g, "");
-  const islaRaw = $("nIsla").value.replace(/\D/g, "");
   const falla = $("nFalla").value.trim();
   let mdaOk = false, islaOk = false;
 
@@ -111,18 +110,20 @@ function validarNuevaFalla() {
     }
   }
 
-  // Isla
-  if (!islaRaw) {
+  // Isla (con posición opcional)
+  const islaVal = $("nIsla").value.trim();
+  if (!islaVal) {
     $("nIslaErr").textContent = "";
     $("nIsla").style.borderColor = "";
   } else {
-    const num = parseInt(islaRaw);
-    if (num >= 100 && num <= 700) {
+    const p = parseIsla(islaVal);
+    if (p.ok) {
       islaOk = true;
-      $("nIslaErr").innerHTML = '<span style="color:var(--ok)">✓ Isla ' + islaRaw + '</span>';
+      const label = p.pos ? 'Isla ' + p.isla + ' · posición ' + p.pos : 'Isla ' + p.isla;
+      $("nIslaErr").innerHTML = '<span style="color:var(--ok)">✓ ' + label + '</span>';
       $("nIsla").style.borderColor = "var(--ok)";
     } else {
-      $("nIslaErr").innerHTML = '<span style="color:var(--danger)">Fuera de rango (100–700)</span>';
+      $("nIslaErr").innerHTML = '<span style="color:var(--danger)">Isla inválida (100–700, ej: 200 o 200-01)</span>';
       $("nIsla").style.borderColor = "var(--danger)";
     }
   }
@@ -131,7 +132,7 @@ function validarNuevaFalla() {
 }
 
 $("nMda").oninput = () => { $("nMda").value = $("nMda").value.replace(/\D/g, ""); validarNuevaFalla(); };
-$("nIsla").oninput = () => { $("nIsla").value = $("nIsla").value.replace(/\D/g, ""); validarNuevaFalla(); };
+$("nIsla").oninput = () => { $("nIsla").value = $("nIsla").value.replace(/[^0-9-]/g, ""); validarNuevaFalla(); };
 $("nFalla").oninput = validarNuevaFalla;
 
 $("fabNueva").onclick = () => {
@@ -143,13 +144,13 @@ $("fabNueva").onclick = () => {
 };
 $("guardarFalla").onclick = async () => {
   const mda = mda6($("nMda").value);
-  const isla = $("nIsla").value.trim().replace(/\D/g, "");
   const falla = $("nFalla").value.trim();
   const mdaNum = parseInt(mda);
   if (isNaN(mdaNum) || mdaNum < 100000 || mdaNum > 101199) { toast("MDA inválido"); return; }
-  const islaNum = parseInt(isla);
-  if (isNaN(islaNum) || islaNum < 100 || islaNum > 700) { toast("Isla inválida"); return; }
+  const p = parseIsla($("nIsla").value);
+  if (!p.ok) { toast("Isla inválida"); return; }
   if (!falla) { toast("Falta la falla"); return; }
+  const isla = p.valor;
   const d = { mda, isla, falla, estado: "pendiente", tecnico, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").insert(d);

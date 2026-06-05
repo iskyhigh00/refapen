@@ -1,5 +1,38 @@
 const accSel = {};
 
+async function buscarSugerencias(fallaTexto, fallaId) {
+  if (!navigator.onLine) return [];
+  const palabras = fallaTexto.toLowerCase().replace(/[^a-záéíóúñü0-9\s]/g, "").split(/\s+/).filter(p => p.length > 2);
+  if (!palabras.length) return [];
+
+  const { data: resueltas } = await sb.from("mdas_fallas").select("id, falla").eq("estado", "resuelta").neq("id", fallaId);
+  if (!resueltas || !resueltas.length) return [];
+
+  const scored = resueltas.map(r => {
+    const txt = r.falla.toLowerCase();
+    const hits = palabras.filter(p => txt.includes(p)).length;
+    return { id: r.id, falla: r.falla, score: hits / palabras.length };
+  }).filter(r => r.score >= 0.4).sort((a, b) => b.score - a.score).slice(0, 10);
+
+  if (!scored.length) return [];
+
+  const ids = scored.map(r => r.id);
+  const { data: acciones } = await sb.from("acciones").select("accion, resultado, falla_id").in("falla_id", ids).eq("resultado", "resolvio").eq("anulada", false);
+  if (!acciones || !acciones.length) return [];
+
+  const conteo = {};
+  acciones.forEach(a => {
+    if (!conteo[a.accion]) conteo[a.accion] = { accion: a.accion, veces: 0, fallas: new Set() };
+    conteo[a.accion].veces++;
+    conteo[a.accion].fallas.add(a.falla_id);
+  });
+
+  return Object.values(conteo)
+    .map(c => ({ accion: c.accion, veces: c.veces, enFallas: c.fallas.size }))
+    .sort((a, b) => b.veces - a.veces)
+    .slice(0, 5);
+}
+
 function mostrarOverlayCambio(acc, callback) {
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px";
@@ -133,8 +166,24 @@ async function subirFoto(fallaId, file) {
   cargarFotos(fallaId);
 }
 
-async function cargarFotos(fallaId) {
-  const grid = document.querySelector(`[data-fotos="${fallaId}"]`);
+async function cargarSugerencias(fallaId, fallaTexto, boxDirecto) {
+  const box = boxDirecto || document.querySelector(`[data-sug="${fallaId}"]`);
+  if (!box) return;
+  const sugs = await buscarSugerencias(fallaTexto, fallaId);
+  if (!sugs.length) return;
+  box.innerHTML = `
+    <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">💡 Sugerencias basadas en fallas similares resueltas</div>
+      ${sugs.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border)">
+        <span style="font-size:13px">${esc(s.accion)}</span>
+        <span style="font-size:11px;color:var(--ok);white-space:nowrap;margin-left:8px">resolvió ${s.veces}× en ${s.enFallas} falla${s.enFallas > 1 ? "s" : ""}</span>
+      </div>`).join("")}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Basado en el historial de fallas similares</div>
+    </div>`;
+}
+
+async function cargarFotos(fallaId, gridDirecto) {
+  const grid = gridDirecto || document.querySelector(`[data-fotos="${fallaId}"]`);
   if (!grid) return;
   if (!navigator.onLine) {
     grid.innerHTML = '<p style="color:var(--muted);font-size:12px">Sin conexión para cargar fotos</p>';
@@ -143,7 +192,7 @@ async function cargarFotos(fallaId) {
   try {
     const { data, error } = await sb.storage.from("fotos").list(String(fallaId), { sortBy: { column: "created_at", order: "desc" } });
     if (error) { grid.innerHTML = '<p style="color:var(--danger);font-size:12px">Error cargando fotos</p>'; return; }
-    const fotos = (data || []).filter(f => f.name && !f.name.startsWith(".") && f.metadata);
+    const fotos = (data || []).filter(f => f.name && !f.name.startsWith("."));
     if (!fotos.length) { grid.innerHTML = ""; return; }
     grid.innerHTML = "";
     const urls = fotos.map(f => sb.storage.from("fotos").getPublicUrl(`${fallaId}/${f.name}`).data.publicUrl);
@@ -241,7 +290,16 @@ async function abrirMda(mdaNum) {
       const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
       acciones = data || [];
     }
-    body.appendChild(renderFalla(f, acciones));
+    const fallaDiv = renderFalla(f, acciones);
+    body.appendChild(fallaDiv);
+    if (navigator.onLine) {
+      const grid = fallaDiv.querySelector(`[data-fotos="${f.id}"]`);
+      if (grid) await cargarFotos(f.id, grid);
+      if (f.estado !== "resuelta") {
+        const sugBox = fallaDiv.querySelector(`[data-sug="${f.id}"]`);
+        cargarSugerencias(f.id, f.falla, sugBox);
+      }
+    }
   }
 
   // Historial de esta máquina
@@ -324,6 +382,7 @@ function renderFalla(f, acciones) {
   div.innerHTML = `
     <h3 style="font-size:20px;margin-bottom:6px">${esc(f.falla)}</h3>
     <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
+    <div class="sugerencias-box" data-sug="${f.id}"></div>
     <div class="acciones-list">${accHtml || '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>'}</div>
     <div style="margin-top:10px">
       <div class="fotos-grid" data-fotos="${f.id}"></div>
@@ -339,9 +398,9 @@ function renderFalla(f, acciones) {
         <div style="margin:10px 0 14px">
           <label style="margin:0 0 6px;font-size:12px">¿Qué estás registrando?</label>
           <div class="seg res" data-resseg="${f.id}">
-            <button class="on" data-v="resolvio">Lo hice ✓</button>
-            <button data-v="no_resolvio">No funcionó ✗</button>
-            <button data-v="pendiente">Sugiero →</button>
+            <button class="on" data-v="resolvio">Resolvió ✓</button>
+            <button data-v="no_resolvio">No resolvió ✗</button>
+            <button data-v="pendiente">Probar esto →</button>
           </div>
         </div>
         <div id="selacc-${f.id}" class="sel-accion hidden"></div>
@@ -390,7 +449,6 @@ function renderFalla(f, acciones) {
   // Fotos
   const fotoInput = div.querySelector("[data-fotoinput='" + f.id + "']");
   if (fotoInput) fotoInput.onchange = e => { const file = e.target.files[0]; if (file) subirFoto(f.id, file); };
-  if (navigator.onLine) cargarFotos(f.id);
   return div;
 }
 

@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<div id="appVersion" style="position:fixed;top:4px;right:8px;font-size:10px;color:var(--muted);opacity:.5;z-index:9999;pointer-events:none">v1.0</div>
 
 <div id="login" class="login">
   <h2>Fallas MDA</h2>
@@ -48,8 +49,8 @@
     <label>MDA <span style="font-weight:400;color:var(--muted)">(100000 – 101199)</span></label>
     <input id="nMda" inputmode="numeric" maxlength="6" placeholder="100234">
     <div id="nMdaErr" style="font-size:12px;margin-top:4px;min-height:16px"></div>
-    <label>Isla <span style="font-weight:400;color:var(--muted)">(100 – 700)</span></label>
-    <input id="nIsla" inputmode="numeric" maxlength="3" placeholder="100">
+    <label>Isla <span style="font-weight:400;color:var(--muted)">(100 – 700, opcionalmente con posición: 200-01)</span></label>
+    <input id="nIsla" inputmode="text" maxlength="6" placeholder="200-01">
     <div id="nIslaErr" style="font-size:12px;margin-top:4px;min-height:16px"></div>
     <label>Descripción de la falla</label>
     <textarea id="nFalla" placeholder="pérdida de imagen en pantalla superior"></textarea>
