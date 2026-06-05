@@ -1,11 +1,25 @@
+let _histFallas = [];
+
+function filtrarHistorial() {
+  const q = ($("buscarHist")?.value || "").toLowerCase().trim();
+  const body = $("histBody");
+  body.querySelectorAll(".mda-card").forEach(card => {
+    if (!q) { card.style.display = ""; return; }
+    const texto = card.textContent.toLowerCase();
+    card.style.display = texto.includes(q) ? "" : "none";
+  });
+}
+
 async function cargarHistorial() {
   const body = $("histBody");
   body.innerHTML = '<p style="color:var(--muted)">Cargando…</p>';
+  if ($("buscarHist")) $("buscarHist").value = "";
   if (!navigator.onLine) { body.innerHTML = '<p style="color:var(--muted)">Sin conexión.</p>'; return; }
 
   const { data: fallas } = await sb.from("mdas_fallas").select("*").eq("estado", "resuelta").order("updated_at", { ascending: false });
   if (!fallas?.length) { body.innerHTML = '<div class="empty"><p>Sin resueltas aún</p></div>'; return; }
 
+  _histFallas = fallas;
   body.innerHTML = "";
   fallas.forEach(f => {
     const card = document.createElement("div");
@@ -26,4 +40,6 @@ async function cargarHistorial() {
     card.querySelector(".mda-head").onclick = () => { $("scrHist").classList.add("hidden"); abrirMda(f.mda); };
     body.appendChild(card);
   });
+
+  if ($("buscarHist")) $("buscarHist").oninput = filtrarHistorial;
 }

@@ -32,7 +32,7 @@
   </header>
   <main>
     <div style="padding:0 0 10px">
-      <input id="buscarMda" inputmode="numeric" placeholder="Buscar MDA…" style="margin:0;padding:10px 14px;font-size:14px;border-radius:20px">
+      <input id="buscarMda" inputmode="text" placeholder="Buscar MDA, isla o descripción…" style="margin:0;padding:10px 14px;font-size:14px;border-radius:20px">
     </div>
     <div id="lista"></div>
   </main>
@@ -54,6 +54,9 @@
     <div id="nIslaErr" style="font-size:12px;margin-top:4px;min-height:16px"></div>
     <label>Descripción de la falla</label>
     <textarea id="nFalla" placeholder="pérdida de imagen en pantalla superior"></textarea>
+    <label style="font-weight:400;color:var(--muted);font-size:13px">Fotos (opcional)</label>
+    <label class="btn btn-sec" style="cursor:pointer;display:inline-block;margin-bottom:8px">📷 Agregar foto<input type="file" id="nFotos" accept="image/*" capture="environment" multiple style="display:none"></label>
+    <div id="nFotosPreview" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <button class="btn" id="guardarFalla" disabled>Crear falla</button>
   </div>
 </div>
@@ -63,6 +66,9 @@
   <div class="screen-head">
     <button class="back-btn" data-close="scrHist">‹ Volver</button>
     <h2>Historial de resueltas</h2>
+  </div>
+  <div style="padding:10px 16px 0">
+    <input id="buscarHist" inputmode="text" placeholder="Buscar por MDA, técnico o descripción…" style="margin:0;padding:10px 14px;font-size:14px;border-radius:20px">
   </div>
   <div class="screen-body" id="histBody"></div>
 </div>
