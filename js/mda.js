@@ -166,8 +166,8 @@ async function subirFoto(fallaId, file) {
   cargarFotos(fallaId);
 }
 
-async function cargarSugerencias(fallaId, fallaTexto) {
-  const box = document.querySelector(`[data-sug="${fallaId}"]`);
+async function cargarSugerencias(fallaId, fallaTexto, boxDirecto) {
+  const box = boxDirecto || document.querySelector(`[data-sug="${fallaId}"]`);
   if (!box) return;
   const sugs = await buscarSugerencias(fallaTexto, fallaId);
   if (!sugs.length) return;
@@ -182,8 +182,8 @@ async function cargarSugerencias(fallaId, fallaTexto) {
     </div>`;
 }
 
-async function cargarFotos(fallaId) {
-  const grid = document.querySelector(`[data-fotos="${fallaId}"]`);
+async function cargarFotos(fallaId, gridDirecto) {
+  const grid = gridDirecto || document.querySelector(`[data-fotos="${fallaId}"]`);
   if (!grid) return;
   if (!navigator.onLine) {
     grid.innerHTML = '<p style="color:var(--muted);font-size:12px">Sin conexión para cargar fotos</p>';
@@ -192,7 +192,7 @@ async function cargarFotos(fallaId) {
   try {
     const { data, error } = await sb.storage.from("fotos").list(String(fallaId), { sortBy: { column: "created_at", order: "desc" } });
     if (error) { grid.innerHTML = '<p style="color:var(--danger);font-size:12px">Error cargando fotos</p>'; return; }
-    const fotos = (data || []).filter(f => f.name && !f.name.startsWith(".") && f.name !== ".emptyFolderPlaceholder");
+    const fotos = (data || []).filter(f => f.name && !f.name.startsWith("."));
     if (!fotos.length) { grid.innerHTML = ""; return; }
     grid.innerHTML = "";
     const urls = fotos.map(f => sb.storage.from("fotos").getPublicUrl(`${fallaId}/${f.name}`).data.publicUrl);
@@ -290,10 +290,15 @@ async function abrirMda(mdaNum) {
       const { data } = await sb.from("acciones").select("*").eq("falla_id", f.id).order("created_at", { ascending: true });
       acciones = data || [];
     }
-    body.appendChild(renderFalla(f, acciones));
+    const fallaDiv = renderFalla(f, acciones);
+    body.appendChild(fallaDiv);
     if (navigator.onLine) {
-      cargarFotos(f.id);
-      if (f.estado !== "resuelta") cargarSugerencias(f.id, f.falla);
+      const grid = fallaDiv.querySelector(`[data-fotos="${f.id}"]`);
+      if (grid) await cargarFotos(f.id, grid);
+      if (f.estado !== "resuelta") {
+        const sugBox = fallaDiv.querySelector(`[data-sug="${f.id}"]`);
+        cargarSugerencias(f.id, f.falla, sugBox);
+      }
     }
   }
 
@@ -393,9 +398,9 @@ function renderFalla(f, acciones) {
         <div style="margin:10px 0 14px">
           <label style="margin:0 0 6px;font-size:12px">¿Qué estás registrando?</label>
           <div class="seg res" data-resseg="${f.id}">
-            <button class="on" data-v="resolvio">Lo hice ✓</button>
-            <button data-v="no_resolvio">No funcionó ✗</button>
-            <button data-v="pendiente">Sugiero →</button>
+            <button class="on" data-v="resolvio">Resolvió ✓</button>
+            <button data-v="no_resolvio">No resolvió ✗</button>
+            <button data-v="pendiente">Probar esto →</button>
           </div>
         </div>
         <div id="selacc-${f.id}" class="sel-accion hidden"></div>
