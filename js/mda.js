@@ -103,12 +103,28 @@ async function subirFoto(fallaId, file) {
   toast("Subiendo foto…");
   const blob = await comprimirImagen(file);
   const path = `${fallaId}/${Date.now()}.jpg`;
+  if (!navigator.onLine) {
+    toast("Sin conexión · la foto se subirá al reconectar");
+    const reader = new FileReader();
+    reader.onload = () => {
+      cola.push({ id: uid(), t: "foto", d: { fallaId, path, base64: reader.result } });
+      guardarCola();
+    };
+    reader.readAsDataURL(blob);
+    return;
+  }
   const { error } = await sb.storage.from("fotos").upload(path, blob, { contentType: "image/jpeg" });
   if (error) {
     if (error.message?.includes("not found") || error.statusCode === 404) {
       toast("Crea el bucket 'fotos' en Supabase Storage");
     } else {
-      toast("Error: " + error.message);
+      toast("Error al subir · se reintentará al reconectar");
+      const reader = new FileReader();
+      reader.onload = () => {
+        cola.push({ id: uid(), t: "foto", d: { fallaId, path, base64: reader.result } });
+        guardarCola();
+      };
+      reader.readAsDataURL(blob);
     }
     return;
   }
@@ -120,21 +136,27 @@ async function subirFoto(fallaId, file) {
 async function cargarFotos(fallaId) {
   const grid = document.querySelector(`[data-fotos="${fallaId}"]`);
   if (!grid) return;
+  if (!navigator.onLine) {
+    grid.innerHTML = '<p style="color:var(--muted);font-size:12px">Sin conexión para cargar fotos</p>';
+    return;
+  }
   try {
     const { data, error } = await sb.storage.from("fotos").list(String(fallaId), { sortBy: { column: "created_at", order: "desc" } });
+    if (error) { grid.innerHTML = '<p style="color:var(--danger);font-size:12px">Error cargando fotos</p>'; return; }
     const fotos = (data || []).filter(f => f.name && !f.name.startsWith(".") && f.metadata);
-    if (error || !fotos.length) { grid.innerHTML = ""; return; }
+    if (!fotos.length) { grid.innerHTML = ""; return; }
     grid.innerHTML = "";
     const urls = fotos.map(f => sb.storage.from("fotos").getPublicUrl(`${fallaId}/${f.name}`).data.publicUrl);
     fotos.forEach((f, idx) => {
       const img = document.createElement("img");
       img.src = urls[idx];
       img.className = "foto-thumb";
-      img.onclick = ev => { ev.stopPropagation(); abrirGaleria(urls, idx); };
+      img.onerror = () => { img.style.display = "none"; };
+      img.onclick = ev => { ev.stopPropagation(); abrirGaleria(urls.filter((_, i) => document.querySelectorAll(`[data-fotos="${fallaId}"] img`)[i]?.style.display !== "none"), idx); };
       grid.appendChild(img);
     });
   } catch (e) {
-    grid.innerHTML = "";
+    grid.innerHTML = '<p style="color:var(--danger);font-size:12px">Error cargando fotos</p>';
   }
 }
 
@@ -191,7 +213,8 @@ async function abrirMda(mdaNum) {
     const { data } = await sb.from("mdas_fallas").select("*").eq("mda", mdaNum).order("created_at", { ascending: false });
     fallas = data || [];
   } else {
-    fallas = JSON.parse(localStorage.getItem("cache_fallas") || "[]").filter(f => f.mda === mdaNum);
+    const cached = JSON.parse(localStorage.getItem("cache_fallas") || "{}");
+    fallas = (cached.data || cached || []).filter(f => f.mda === mdaNum);
   }
 
   // Mostrar isla en el título
@@ -468,7 +491,7 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
 
 async function agregarAlCatalogo(nombre, fid, elegirFn) {
   const cats = Object.keys(ACCIONES);
-  const cat = await preguntar("¿A qué categoría pertenece?<br><span style='font-size:12px;color:var(--muted)'>" + cats.join(", ") + "</span>");
+  const cat = await preguntar("¿A qué categoría? (" + cats.join(", ") + ")");
   if (!cat || !cats.includes(cat)) { toast("Categoría inválida"); return; }
   const { error } = await sb.from("catalogo_acciones").insert({ categoria: cat, accion: nombre, activa: true });
   if (error) { toast("Error al agregar"); return; }
@@ -494,11 +517,11 @@ async function addAccion(fallaId) {
     if (prev && navigator.onLine) {
       const rastro = (prev.historial_resultados ? prev.historial_resultados + " → " : "") + `${resLabel[prev.resultado]} (${prev.tecnico} · ${fmtFecha(prev.created_at)})`;
       const { error } = await sb.from("acciones").update({ resultado: res, tecnico: tecnico, created_at: ts, historial_resultados: rastro }).eq("id", prev.id);
-      if (error) { cola.push({ t: "accion", d: { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts } }); guardarCola(); }
+      if (error) { cola.push({ id: uid(), t: "accion", d: { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts } }); guardarCola(); }
     } else {
       const d = { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts };
-      if (navigator.onLine) { const { error } = await sb.from("acciones").insert(d); if (error) { cola.push({ t: "accion", d }); guardarCola(); } }
-      else { cola.push({ t: "accion", d }); guardarCola(); }
+      if (navigator.onLine) { const { error } = await sb.from("acciones").insert(d); if (error) { cola.push({ id: uid(), t: "accion", d }); guardarCola(); } }
+      else { cola.push({ id: uid(), t: "accion", d }); guardarCola(); }
     }
   }
 
@@ -508,7 +531,7 @@ async function addAccion(fallaId) {
   const upd = { updated_at: ts };
   if (nuevoEstado) upd.estado = nuevoEstado;
   if (navigator.onLine) { await sb.from("mdas_fallas").update(upd).eq("id", fallaId); }
-  else if (nuevoEstado) { cola.push({ t: "estado", d: { id: fallaId, estado: nuevoEstado } }); guardarCola(); }
+  else if (nuevoEstado) { cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: nuevoEstado } }); guardarCola(); }
 
   // Sumar al contador permanente de uso
   if (navigator.onLine) {

@@ -3,12 +3,23 @@ let sortMode = "updated"; // "updated" | "created_desc" | "created_asc"
 async function cargarLista() {
   if ($("buscarMda")) $("buscarMda").value = "";
   let fallas = [];
+  let desdeCacheLocal = false;
   if (navigator.onLine) {
     const { data, error } = await sb.from("mdas_fallas").select("*").in("estado", ["pendiente", "observacion"]).order("updated_at", { ascending: true });
-    if (!error && data) { fallas = data; localStorage.setItem("cache_fallas", JSON.stringify(data)); }
-    else fallas = JSON.parse(localStorage.getItem("cache_fallas") || "[]");
+    if (!error && data) {
+      fallas = data;
+      localStorage.setItem("cache_fallas", JSON.stringify({ ts: Date.now(), data }));
+    } else {
+      const cached = JSON.parse(localStorage.getItem("cache_fallas") || "{}");
+      fallas = cached.data || cached || [];
+      if (Array.isArray(cached)) localStorage.setItem("cache_fallas", JSON.stringify({ ts: Date.now(), data: cached }));
+      desdeCacheLocal = true;
+    }
   } else {
-    fallas = JSON.parse(localStorage.getItem("cache_fallas") || "[]").filter(f => f.estado === "pendiente" || f.estado === "observacion");
+    const cached = JSON.parse(localStorage.getItem("cache_fallas") || "{}");
+    const arr = cached.data || cached || [];
+    fallas = (Array.isArray(arr) ? arr : []).filter(f => f.estado === "pendiente" || f.estado === "observacion");
+    desdeCacheLocal = true;
   }
 
   const ultAcc = {};
@@ -41,6 +52,15 @@ async function cargarLista() {
   sortBar.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px";
   sortBar.innerHTML = `<span style="font-size:13px;color:var(--muted)">${fallas.length} falla${fallas.length === 1 ? "" : "s"} activa${fallas.length === 1 ? "" : "s"}</span><button id="btnSort" style="background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer">${sortLabels[sortMode]}</button>`;
   cont.appendChild(sortBar);
+
+  if (desdeCacheLocal) {
+    const cached = JSON.parse(localStorage.getItem("cache_fallas") || "{}");
+    const cacheAge = cached.ts ? tiempoDesde(new Date(cached.ts).toISOString()) : "desconocido";
+    const banner = document.createElement("div");
+    banner.style.cssText = "background:var(--warn);color:#000;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;text-align:center";
+    banner.textContent = navigator.onLine ? "Error al cargar datos frescos · mostrando cache de hace " + cacheAge : "Sin conexión · datos en caché de hace " + cacheAge;
+    cont.insertBefore(banner, sortBar.nextSibling);
+  }
   sortBar.querySelector("#btnSort").onclick = () => {
     sortMode = sortMode === "updated" ? "created_desc" : sortMode === "created_desc" ? "created_asc" : "updated";
     cargarLista();
@@ -113,9 +133,9 @@ async function cambiarEstadoPortada(fallaId, estado) {
   const upd = { estado, updated_at: new Date().toISOString() };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").update(upd).eq("id", fallaId);
-    if (error) { cola.push({ t: "estado", d: { id: fallaId, estado } }); guardarCola(); }
+    if (error) { cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado } }); guardarCola(); }
   } else {
-    cola.push({ t: "estado", d: { id: fallaId, estado } });
+    cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado } });
     guardarCola();
   }
   audit("cambiar_estado", { falla_id: fallaId, estado });
@@ -146,7 +166,7 @@ async function volvioAFallar(fallaId) {
     }
     await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: ts }).eq("id", fallaId);
   } else {
-    cola.push({ t: "estado", d: { id: fallaId, estado: "pendiente" } });
+    cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: "pendiente" } });
     guardarCola();
   }
 

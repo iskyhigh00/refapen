@@ -103,15 +103,17 @@ async function iniciar() {
   $("tecNombre").textContent = tecnico;
   if (isObrist) {
     $("btnStats").classList.remove("hidden");
+    $("btnAdmin").classList.remove("hidden");
     if (!document.getElementById("btnObrist")) {
       const btn = document.createElement("button");
       btn.id = "btnObrist";
       btn.textContent = "Gestión";
-      btn.onclick = () => { abrirPantalla("scrObrist"); cargarObrist(); };
+      btn.onclick = () => navegarConWarning(() => { abrirPantalla("scrObrist"); cargarObrist(); });
       $("btnAdmin").insertAdjacentElement("beforebegin", btn);
     }
   } else {
     $("btnStats").classList.add("hidden");
+    $("btnAdmin").classList.add("hidden");
     const ob = document.getElementById("btnObrist");
     if (ob) ob.remove();
   }

@@ -1,18 +1,30 @@
+let statsFiltro = "todo";
+
 async function cargarStats() {
   const body = $("statsBody");
   body.innerHTML = '<p style="color:var(--muted)">Cargando estadísticas…</p>';
 
-  const [{ data: todas }, { data: acciones }] = await Promise.all([
+  const [{ data: todasRaw }, { data: accionesRaw }] = await Promise.all([
     sb.from("mdas_fallas").select("*"),
     sb.from("acciones").select("accion,resultado,tecnico,created_at,anulada").eq("anulada", false)
   ]);
 
-  if (!todas) { body.innerHTML = '<p style="color:var(--danger)">Error cargando datos</p>'; return; }
+  if (!todasRaw) { body.innerHTML = '<p style="color:var(--danger)">Error cargando datos</p>'; return; }
 
+  function filtrarPorFecha(arr) {
+    if (statsFiltro === "todo") return arr;
+    const ahora = Date.now();
+    const limites = { semana: 7, mes: 30, trimestre: 90 };
+    const dias = limites[statsFiltro] || 9999;
+    const desde = ahora - dias * 86400000;
+    return arr.filter(r => new Date(r.created_at) >= desde);
+  }
+
+  const todas = filtrarPorFecha(todasRaw);
   const pend = todas.filter(f => f.estado === "pendiente");
   const obs = todas.filter(f => f.estado === "observacion");
   const res = todas.filter(f => f.estado === "resuelta");
-  const accs = acciones || [];
+  const accs = filtrarPorFecha(accionesRaw || []);
 
   // Tiempo promedio de resolución
   let tTotal = 0, tCount = 0;
@@ -53,6 +65,12 @@ async function cargarStats() {
   const totalPiezas = piezas.nueva + piezas["usada - probada"] + piezas["usada - dudosa"];
 
   body.innerHTML = `
+    <div class="seg" style="margin-bottom:16px" id="statsFiltroSeg">
+      <button data-sf="todo" class="${statsFiltro === 'todo' ? 'on' : ''}">Todo</button>
+      <button data-sf="semana" class="${statsFiltro === 'semana' ? 'on' : ''}">7 días</button>
+      <button data-sf="mes" class="${statsFiltro === 'mes' ? 'on' : ''}">30 días</button>
+      <button data-sf="trimestre" class="${statsFiltro === 'trimestre' ? 'on' : ''}">90 días</button>
+    </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-num">${todas.length}</div><div class="stat-label">Total</div></div>
       <div class="stat-card warn"><div class="stat-num">${pend.length}</div><div class="stat-label">Pendientes</div></div>
@@ -102,6 +120,10 @@ async function cargarStats() {
 
   $("expFallas").onclick = () => exportarCSV("fallas", todas);
   $("expAcciones").onclick = () => exportarCSV("acciones", accs);
+
+  $("statsFiltroSeg").querySelectorAll("button").forEach(b => {
+    b.onclick = () => { statsFiltro = b.dataset.sf; cargarStats(); };
+  });
 }
 
 function formatMs(ms) {

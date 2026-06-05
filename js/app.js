@@ -22,8 +22,8 @@ function hayAccionesSinGuardar() {
 function cerrarPantallaActual() {
   const abierta = SCREENS.find(id => !$(id).classList.contains("hidden"));
   if (abierta) {
-    if (abierta === "scrMda" && hayAccionesSinGuardar()) {
-      confirmar("Tenés acciones sin guardar. ¿Salir igual?", { ok: "Salir", danger: true }).then(ok => {
+    if (hayAccionesSinGuardar()) {
+      confirmar("Tenes acciones sin guardar. Salir igual?", { ok: "Salir", danger: true }).then(ok => {
         if (ok) { $(abierta).classList.add("hidden"); cargarLista(); }
       });
       return false;
@@ -32,6 +32,14 @@ function cerrarPantallaActual() {
     return true;
   }
   return false;
+}
+
+function navegarConWarning(fn) {
+  if (hayAccionesSinGuardar()) {
+    confirmar("Tenes acciones sin guardar. Salir igual?", { ok: "Salir", danger: true }).then(ok => {
+      if (ok) { accSel && Object.keys(accSel).forEach(k => accSel[k] = []); fn(); }
+    });
+  } else { fn(); }
 }
 
 window.addEventListener("popstate", e => {
@@ -55,18 +63,18 @@ document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => {
 });
 
 // historial
-$("btnHist").onclick = () => {
+$("btnHist").onclick = () => navegarConWarning(() => {
   abrirPantalla("scrHist");
   cargarHistorial();
   audit("abrir_historial", {});
-};
+});
 
 // estadísticas
-$("btnStats").onclick = () => {
+$("btnStats").onclick = () => navegarConWarning(() => {
   abrirPantalla("scrStats");
   cargarStats();
   audit("abrir_stats", {});
-};
+});
 
 // búsqueda de MDA
 $("buscarMda").oninput = () => {
@@ -145,9 +153,9 @@ $("guardarFalla").onclick = async () => {
   const d = { mda, isla, falla, estado: "pendiente", tecnico, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").insert(d);
-    if (error) { cola.push({ t: "falla", d }); guardarCola(); }
+    if (error) { cola.push({ id: uid(), t: "falla", d }); guardarCola(); }
   } else {
-    cola.push({ t: "falla", d }); guardarCola();
+    cola.push({ id: uid(), t: "falla", d }); guardarCola();
   }
   audit("crear_falla", { mda, isla, falla });
   toast("Falla creada");
@@ -157,7 +165,7 @@ $("guardarFalla").onclick = async () => {
 };
 
 // admin
-$("btnAdmin").onclick = async () => {
+$("btnAdmin").onclick = () => navegarConWarning(async () => {
   if (!isObrist) {
     const clave = await preguntar("Clave de acceso:");
     if (clave === null) return;
@@ -166,7 +174,7 @@ $("btnAdmin").onclick = async () => {
   abrirPantalla("scrAdmin");
   cargarAdmin();
   audit("entrar_admin", {});
-};
+});
 
 // cambiar usuario
 function cambiarTecnico() {

@@ -52,6 +52,10 @@ function esc(s) {
   return (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 function claveHora() {
   const n = new Date();
   return String(n.getHours()).padStart(2, "0") + String(n.getMinutes()).padStart(2, "0");
@@ -66,9 +70,9 @@ function confirmar(msg, opts = {}) {
     const box = document.createElement("div");
     box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:340px";
     box.innerHTML = `
-      <div style="font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.4">${msg}</div>
-      <button class="btn ${opts.danger ? 'btn-danger' : 'btn-ok'}" style="margin-top:0">${opts.ok || "Confirmar"}</button>
-      <button class="btn btn-sec" style="margin-top:10px">${opts.cancel || "Cancelar"}</button>`;
+      <div style="font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.4">${esc(msg)}</div>
+      <button class="btn ${opts.danger ? 'btn-danger' : 'btn-ok'}" style="margin-top:0">${esc(opts.ok || "Confirmar")}</button>
+      <button class="btn btn-sec" style="margin-top:10px">${esc(opts.cancel || "Cancelar")}</button>`;
     ov.appendChild(box);
     document.body.appendChild(ov);
     const btns = box.querySelectorAll("button");
@@ -85,7 +89,7 @@ function preguntar(msg, valor = "") {
     const box = document.createElement("div");
     box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:340px";
     box.innerHTML = `
-      <div style="font-size:15px;font-weight:600;margin-bottom:12px;line-height:1.4">${msg}</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:12px;line-height:1.4">${esc(msg)}</div>
       <input type="text" id="pregInput" value="${esc(valor)}" style="margin-bottom:0">
       <button class="btn btn-ok" style="margin-top:12px">Aceptar</button>
       <button class="btn btn-sec" style="margin-top:10px">Cancelar</button>`;
