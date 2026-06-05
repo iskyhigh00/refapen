@@ -398,9 +398,9 @@ function renderFalla(f, acciones) {
         <div style="margin:10px 0 14px">
           <label style="margin:0 0 6px;font-size:12px">¿Qué estás registrando?</label>
           <div class="seg res" data-resseg="${f.id}">
-            <button class="on" data-v="resolvio">Lo hice ✓</button>
-            <button data-v="no_resolvio">No funcionó ✗</button>
-            <button data-v="pendiente">Sugiero →</button>
+            <button class="on" data-v="resolvio">Resolvió ✓</button>
+            <button data-v="no_resolvio">No resolvió ✗</button>
+            <button data-v="pendiente">Probar esto →</button>
           </div>
         </div>
         <div id="selacc-${f.id}" class="sel-accion hidden"></div>
