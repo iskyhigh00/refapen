@@ -27,7 +27,8 @@ async function cargarAdmin() {
       const row = document.createElement("div");
       row.className = "admin-item";
       row.innerHTML = `<span style="${t.activo ? '' : 'text-decoration:line-through;color:var(--muted)'};flex:1">${esc(t.nombre)}</span>
-        <button class="btn-icon" data-sug-tec="${t.id}" data-sug="${!!t.puede_sugerir}" title="Clic para ${t.puede_sugerir ? 'quitar' : 'dar'} permiso de sugerir" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid ${t.puede_sugerir ? 'var(--ok)' : 'var(--danger)'};background:${t.puede_sugerir ? 'var(--ok)' : 'transparent'};color:${t.puede_sugerir ? '#fff' : 'var(--danger)'};opacity:${t.puede_sugerir ? '1' : '.7'}">${t.puede_sugerir ? '✓ Puede sugerir' : '✗ No puede sugerir'}</button>
+        <span style="font-size:12px;white-space:nowrap;color:${t.puede_sugerir ? 'var(--ok)' : 'var(--muted)'}">${t.puede_sugerir ? '✓ Puede sugerir' : '✗ Sin permiso'}</span>
+        <button class="btn-icon" data-sug-tec="${t.id}" data-sug="${!!t.puede_sugerir}" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid ${t.puede_sugerir ? 'var(--danger)' : 'var(--ok)'};color:${t.puede_sugerir ? 'var(--danger)' : 'var(--ok)'};white-space:nowrap">${t.puede_sugerir ? 'Quitar' : 'Habilitar'}</button>
         <button class="btn-icon btn-edit" data-edit-tec="${t.id}" data-nombre="${esc(t.nombre)}">✏️</button>
         <button class="btn-icon btn-del" data-del-tec="${t.id}" data-activo="${t.activo}">${t.activo ? '🗑️' : '↩️'}</button>`;
       lista.appendChild(row);
