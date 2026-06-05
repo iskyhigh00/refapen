@@ -48,6 +48,40 @@ function mda6(v) {
   return v.slice(-6);
 }
 
+// Parsea isla con posición opcional: "200", "200-01", "20001" → { isla: 200, pos: "01"|null, valor: "200-01"|"200", ok: true }
+function parseIsla(raw) {
+  raw = (raw || "").trim();
+  // Formato con guión: 200-01
+  let m = raw.match(/^(\d{3})-(\d{1,2})$/);
+  if (m) {
+    const isla = parseInt(m[1]);
+    const pos = m[2].padStart(2, "0");
+    if (isla >= 100 && isla <= 700) return { isla, pos, valor: isla + "-" + pos, ok: true };
+    return { ok: false };
+  }
+  // Formato 5 dígitos sin guión: 20001
+  if (/^\d{5}$/.test(raw)) {
+    const isla = parseInt(raw.slice(0, 3));
+    const pos = raw.slice(3);
+    if (isla >= 100 && isla <= 700) return { isla, pos, valor: isla + "-" + pos, ok: true };
+    return { ok: false };
+  }
+  // Formato 4 dígitos sin guión: 2001 (isla 200, pos 1)
+  if (/^\d{4}$/.test(raw)) {
+    const isla = parseInt(raw.slice(0, 3));
+    const pos = raw.slice(3).padStart(2, "0");
+    if (isla >= 100 && isla <= 700) return { isla, pos, valor: isla + "-" + pos, ok: true };
+    return { ok: false };
+  }
+  // Solo isla: 200
+  if (/^\d{3}$/.test(raw)) {
+    const isla = parseInt(raw);
+    if (isla >= 100 && isla <= 700) return { isla, pos: null, valor: String(isla), ok: true };
+    return { ok: false };
+  }
+  return { ok: false };
+}
+
 function esc(s) {
   return (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
