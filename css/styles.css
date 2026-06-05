@@ -182,8 +182,7 @@ textarea{resize:vertical;min-height:80px}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);padding:10px 20px;border-radius:10px;z-index:50;font-size:13px;box-shadow:0 4px 20px var(--shadow)}
 
 /* === ADMIN === */
-.admin-section{margin-bottom:24px}
-.admin-section h3{font-size:14px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.admin-section{margin-bottom:16px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
 .admin-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
 .admin-item span{flex:1}
 .admin-item input{padding:6px;font-size:13px;margin:0}
@@ -191,6 +190,7 @@ textarea{resize:vertical;min-height:80px}
 .btn-edit{color:var(--accent)}
 .btn-del{color:var(--danger)}
 .cat-select{margin-bottom:8px}
+.obr-sub-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
 
 /* === STATS === */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
