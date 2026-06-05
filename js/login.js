@@ -103,6 +103,7 @@ async function iniciar() {
   $("tecNombre").textContent = tecnico;
   if (isObrist) {
     $("btnStats").classList.remove("hidden");
+    $("btnAdmin").classList.remove("hidden");
     if (!document.getElementById("btnObrist")) {
       const btn = document.createElement("button");
       btn.id = "btnObrist";
@@ -112,6 +113,7 @@ async function iniciar() {
     }
   } else {
     $("btnStats").classList.add("hidden");
+    $("btnAdmin").classList.add("hidden");
     const ob = document.getElementById("btnObrist");
     if (ob) ob.remove();
   }
