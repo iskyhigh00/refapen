@@ -1,3 +1,5 @@
+const $ = id => document.getElementById(id);
+
 function getCfg(key, def) {
   const v = localStorage.getItem("cfg_" + key);
   return v !== null ? parseFloat(v) : def;
