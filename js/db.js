@@ -7,10 +7,12 @@ let TODAS = [];
 let TOP_ACCIONES = [];
 
 async function cargarMaestros() {
-  const [{ data: tecs }, { data: cats }] = await Promise.all([
+  const [{ data: tecs, error: eTecs }, { data: cats, error: eCats }] = await Promise.all([
     sb.from("tecnicos").select("*").eq("activo", true).order("nombre"),
     sb.from("catalogo_acciones").select("*").eq("activa", true).order("categoria").order("accion")
   ]);
+  if (eTecs) console.error("Error cargando técnicos:", eTecs);
+  if (eCats) console.error("Error cargando catálogo:", eCats);
   TECNICOS_DATA = tecs || [];
   TECNICOS = TECNICOS_DATA.map(t => t.nombre);
   ACCIONES = {};
