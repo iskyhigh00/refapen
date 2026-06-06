@@ -554,15 +554,19 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
     if (q) {
       const res = TODAS.filter(a => a.toLowerCase().includes(q));
       if (!res.length) {
-        cats.innerHTML = '<div class="no-res">Sin coincidencias</div>';
-        const tecData = TECNICOS_DATA.find(t => t.nombre === tecnico);
-        const puedeSugerir = isObrist || (tecData && tecData.puede_sugerir === true);
-        if (puedeSugerir) {
-          const btn = document.createElement("button");
-          btn.className = "add-nueva-acc";
-          btn.textContent = `+ Agregar "${filtro}" al catálogo`;
-          btn.onclick = () => agregarAlCatalogo(filtro, fid, elegir);
-          cats.appendChild(btn);
+        cats.innerHTML = '<div class="no-res">Sin coincidencias en el catálogo</div>';
+        const btnUsar = document.createElement("button");
+        btnUsar.className = "add-nueva-acc";
+        btnUsar.textContent = `Usar "${filtro}" directo →`;
+        btnUsar.onclick = () => { elegir(filtro); search.value = ""; pintarCats(""); };
+        cats.appendChild(btnUsar);
+        if (isObrist) {
+          const btnCat = document.createElement("button");
+          btnCat.className = "add-nueva-acc";
+          btnCat.style.marginTop = "6px";
+          btnCat.textContent = `+ Agregar al catálogo`;
+          btnCat.onclick = () => agregarAlCatalogo(filtro, fid, elegir);
+          cats.appendChild(btnCat);
         }
         return;
       }

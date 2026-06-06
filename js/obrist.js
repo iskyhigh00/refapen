@@ -200,7 +200,91 @@ async function cargarObrist() {
 
 
   // ══════════════════════════════════════════════════════════════════
-  // 3. AUDITORÍA
+  // 3. ACCIONES NO CATALOGADAS
+  // ══════════════════════════════════════════════════════════════════
+  const revCuerpo = mkSeccion({
+    icono: "🔍",
+    titulo: "Acciones no catalogadas",
+    subtitulo: "Registradas por técnicos fuera del catálogo — revisá y decidís",
+    abierto: true
+  });
+
+  (async () => {
+    revCuerpo.innerHTML = '<p style="color:var(--muted);font-size:13px">Cargando…</p>';
+
+    const dismissedKey = "obrist_dismissed_accs";
+    const dismissed = new Set(JSON.parse(localStorage.getItem(dismissedKey) || "[]"));
+
+    const [{ data: catData }, { data: accs }] = await Promise.all([
+      sb.from("catalogo_acciones").select("accion").eq("activa", true),
+      sb.from("acciones").select("*, mdas_fallas(mda, isla, falla)").eq("anulada", false)
+        .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
+        .order("created_at", { ascending: false })
+    ]);
+
+    const catalogoSet = new Set((catData || []).map(c => c.accion.toLowerCase().trim()));
+    const stripSuffix = s => s.replace(/\s*\([^)]*\)\s*$/g, "").trim();
+
+    const noEnCatalogo = (accs || []).filter(a =>
+      !dismissed.has(a.id) && !catalogoSet.has(stripSuffix(a.accion).toLowerCase())
+    );
+
+    if (!noEnCatalogo.length) {
+      revCuerpo.innerHTML = '<p style="color:var(--ok);font-size:13px">✓ Sin acciones fuera del catálogo en los últimos 30 días</p>';
+      return;
+    }
+
+    revCuerpo.innerHTML = `<p style="font-size:12px;color:var(--muted);margin-bottom:12px">${noEnCatalogo.length} acción${noEnCatalogo.length !== 1 ? "es" : ""} no catalogada${noEnCatalogo.length !== 1 ? "s" : ""} en los últimos 30 días</p>`;
+
+    noEnCatalogo.forEach(a => {
+      const mda = a.mdas_fallas;
+      const base = stripSuffix(a.accion);
+      const resColor = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
+      const resLabel = a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente";
+
+      const row = document.createElement("div");
+      row.className = "admin-item";
+      row.style.cssText = "flex-direction:column;align-items:start;gap:8px;padding:12px";
+      row.innerHTML = `
+        <div style="width:100%;display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div>
+            <div style="font-weight:700;font-size:14px">${esc(a.accion)}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(a.tecnico)} · MDA ${mda?.mda || "?"} · isla ${mda?.isla || "?"} · hace ${tiempoDesde(a.created_at)}</div>
+            ${mda?.falla ? `<div style="font-size:12px;color:var(--muted);margin-top:1px;font-style:italic">${esc(mda.falla)}</div>` : ""}
+          </div>
+          <span style="color:${resColor};font-size:11px;font-weight:700;flex:none">${resLabel}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ok btn-sm" style="margin:0" data-addcat>+ Agregar al catálogo</button>
+          <button class="btn btn-sec btn-sm" style="margin:0" data-dismiss>✓ Está bien así</button>
+        </div>`;
+
+      row.querySelector("[data-addcat]").onclick = async () => {
+        const catNames = Object.keys(ACCIONES);
+        const cat = await preguntar("¿A qué categoría? (" + catNames.join(", ") + ")");
+        if (!cat || !catNames.includes(cat)) { toast("Categoría inválida"); return; }
+        const { error } = await sb.from("catalogo_acciones").insert({ categoria: cat, accion: base, activa: true });
+        if (error) { toast("Error: " + error.message); return; }
+        audit("agregar_accion_catalogo", { accion: base, categoria: cat });
+        await cargarMaestros();
+        toast("Agregada al catálogo");
+        row.remove();
+      };
+
+      row.querySelector("[data-dismiss]").onclick = () => {
+        dismissed.add(a.id);
+        localStorage.setItem(dismissedKey, JSON.stringify([...dismissed]));
+        row.remove();
+        toast("OK");
+      };
+
+      revCuerpo.appendChild(row);
+    });
+  })();
+
+
+  // ══════════════════════════════════════════════════════════════════
+  // 4. AUDITORÍA
   // ══════════════════════════════════════════════════════════════════
   const auditCuerpo = mkSeccion({
     icono: "📋",
