@@ -371,6 +371,7 @@ function abrirGaleria(urls, index) {
 }
 
 async function abrirMda(mdaNum) {
+  mdaActual = mdaNum;
   abrirPantalla("scrMda");
   $("mdaTitulo").textContent = "MDA " + mdaNum;
   $("mdaTecBadge").textContent = tecnico;

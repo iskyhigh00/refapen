@@ -124,6 +124,7 @@ async function iniciar() {
   }
   pintarSync();
   sincronizar();
+  iniciarRealtime();
   await cargarMaestros();
   cargarLista();
 }
