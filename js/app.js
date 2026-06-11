@@ -23,7 +23,7 @@ function cerrarPantallaActual() {
   const abierta = SCREENS.find(id => !$(id).classList.contains("hidden"));
   if (abierta) {
     if (hayAccionesSinGuardar()) {
-      confirmar("Tenes acciones sin guardar. Salir igual?", { ok: "Salir", danger: true }).then(ok => {
+      confirmar("Tienes acciones sin guardar. ¿Salir igual?", { ok: "Salir", danger: true }).then(ok => {
         if (ok) { $(abierta).classList.add("hidden"); cargarLista(); }
       });
       return false;
@@ -36,7 +36,7 @@ function cerrarPantallaActual() {
 
 function navegarConWarning(fn) {
   if (hayAccionesSinGuardar()) {
-    confirmar("Tenes acciones sin guardar. Salir igual?", { ok: "Salir", danger: true }).then(ok => {
+    confirmar("Tienes acciones sin guardar. ¿Salir igual?", { ok: "Salir", danger: true }).then(ok => {
       if (ok) { accSel && Object.keys(accSel).forEach(k => accSel[k] = []); fn(); }
     });
   } else { fn(); }

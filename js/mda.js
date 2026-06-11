@@ -25,7 +25,7 @@ function abrirSelectorTiempo(fid, btnRef) {
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px">La acción se registrará con esa fecha y hora</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="stOpts"></div>
     <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">O elegí fecha y hora exactas:</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">O elige fecha y hora exactas:</div>
       <input type="datetime-local" id="stCustom" value="${nowStr}" style="margin-bottom:8px">
       <button class="btn btn-sec btn-sm" id="stCustomOk" style="margin:0">Usar esta fecha</button>
     </div>
@@ -51,7 +51,7 @@ function abrirSelectorTiempo(fid, btnRef) {
 
   box.querySelector("#stCustomOk").onclick = () => {
     const val = box.querySelector("#stCustom").value;
-    if (!val) { toast("Elegí una fecha"); return; }
+    if (!val) { toast("Elige una fecha"); return; }
     const fecha = new Date(val);
     if (isNaN(fecha)) { toast("Fecha inválida"); return; }
     if (fecha > new Date()) { toast("No puede ser en el futuro"); return; }

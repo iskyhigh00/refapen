@@ -142,7 +142,7 @@ async function cargarObrist() {
       </div>
       <div>
         <label style="margin:0 0 6px">2. Máquinas (MDA e isla)</label>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Pegá desde Excel (dos columnas: MDA · isla) o subí un CSV separado por comas. La isla acepta formatos: 200, 200-01, 20001.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Pega desde Excel (dos columnas: MDA · isla) o sube un CSV separado por comas. La isla acepta formatos: 200, 200-01, 20001.</p>
         <textarea id="excelPaste" placeholder="100011&#9;113&#10;100234&#9;200-01&#10;…" style="min-height:80px;margin:0;font-family:monospace;font-size:13px"></textarea>
         <label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">
           ↑ O subir CSV<input type="file" id="csvFile" accept=".csv,.txt" style="display:none">
@@ -205,7 +205,7 @@ async function cargarObrist() {
   const revCuerpo = mkSeccion({
     icono: "🔍",
     titulo: "Acciones no catalogadas",
-    subtitulo: "Registradas por técnicos fuera del catálogo — revisá y decidís",
+    subtitulo: "Registradas por técnicos fuera del catálogo — revisa y decide",
     abierto: true
   });
 

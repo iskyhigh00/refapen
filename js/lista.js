@@ -190,7 +190,7 @@ async function cargarLista() {
 }
 
 async function cambiarEstadoPortada(fallaId, estado) {
-  if (estado === "resuelta") { if (!await confirmar("¿Resuelta con váucher?", { ok: "Sí, resuelta", danger: false })) return; }
+  if (estado === "resuelta") { if (!await confirmar("¿Resuelta con voucher?", { ok: "Sí, resuelta", danger: false })) return; }
   if (estado === "observacion") { if (!await confirmar("¿Pasar a observación?", { ok: "Sí, en observación", danger: false })) return; }
   const upd = { estado, updated_at: new Date().toISOString() };
   if (navigator.onLine) {
