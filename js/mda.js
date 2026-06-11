@@ -1,5 +1,70 @@
 const accSel = {};
+const accTime = {};
 const elegirCallbacks = {};
+
+function abrirSelectorTiempo(fid, btnRef) {
+  const OPCIONES = [
+    { label: "15 min",  ms: 15 * 60000 },
+    { label: "30 min",  ms: 30 * 60000 },
+    { label: "1 hora",  ms: 3600000 },
+    { label: "2 horas", ms: 2 * 3600000 },
+    { label: "3 horas", ms: 3 * 3600000 },
+    { label: "6 horas", ms: 6 * 3600000 },
+    { label: "12 horas",ms: 12 * 3600000 },
+    { label: "1 día",   ms: 24 * 3600000 },
+  ];
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:320px";
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const nowStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  box.innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">⏱ ¿Cuándo lo hiciste?</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">La acción se registrará con esa fecha y hora</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="stOpts"></div>
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">O elegí fecha y hora exactas:</div>
+      <input type="datetime-local" id="stCustom" value="${nowStr}" style="margin-bottom:8px">
+      <button class="btn btn-sec btn-sm" id="stCustomOk" style="margin:0">Usar esta fecha</button>
+    </div>
+    <button class="btn btn-sec btn-sm" id="stAhora" style="margin:0">✕ Volver a "Ahora"</button>`;
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+
+  function seleccionar(fecha, label) {
+    accTime[fid] = fecha.toISOString();
+    btnRef.textContent = `⏱ Hace ${label}`;
+    btnRef.style.cssText = "margin:0;font-size:12px;color:var(--warn);border-color:var(--warn)";
+    ov.remove();
+  }
+
+  const optsEl = box.querySelector("#stOpts");
+  OPCIONES.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "btn btn-sec btn-sm"; b.style.margin = "0";
+    b.textContent = `Hace ${o.label}`;
+    b.onclick = () => seleccionar(new Date(Date.now() - o.ms), o.label);
+    optsEl.appendChild(b);
+  });
+
+  box.querySelector("#stCustomOk").onclick = () => {
+    const val = box.querySelector("#stCustom").value;
+    if (!val) { toast("Elegí una fecha"); return; }
+    const fecha = new Date(val);
+    if (isNaN(fecha)) { toast("Fecha inválida"); return; }
+    if (fecha > new Date()) { toast("No puede ser en el futuro"); return; }
+    seleccionar(fecha, fmtFecha(fecha.toISOString()));
+  };
+
+  box.querySelector("#stAhora").onclick = () => {
+    accTime[fid] = null;
+    btnRef.textContent = "⏱ Ahora";
+    btnRef.style.cssText = "margin:0;font-size:12px";
+    ov.remove();
+  };
+}
 
 async function editarFalla(f) {
   const ov = document.createElement("div");
@@ -562,7 +627,10 @@ function renderFalla(f, acciones) {
         </div>
         <div id="selacc-${f.id}" class="sel-accion hidden"></div>
         <div class="reg-arriba hidden" data-regarriba="${f.id}">
-          <button class="btn btn-ok" data-addacc="${f.id}" style="margin-top:10px">Guardar</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <button class="btn btn-ok" data-addacc="${f.id}" style="margin:0">Guardar</button>
+            <button class="btn btn-sec btn-sm" data-tiempobtn="${f.id}" style="margin:0;font-size:12px">⏱ Ahora</button>
+          </div>
         </div>
         <input class="acc-search" placeholder="Buscar acción…" data-search="${f.id}" style="margin-bottom:10px">
         <div class="chips" data-chips="${f.id}"></div>
@@ -600,6 +668,7 @@ function renderFalla(f, acciones) {
   }
   if (!cerrada) initSelectorAcciones(div, f.id, acciones);
   div.querySelector("[data-addacc='" + f.id + "']")?.addEventListener("click", () => addAccion(f.id));
+  div.querySelector("[data-tiempobtn='" + f.id + "']")?.addEventListener("click", e => { e.stopPropagation(); abrirSelectorTiempo(f.id, e.currentTarget); });
   div.querySelectorAll("[data-resolve]").forEach(el => el.addEventListener("click", () => {
     resolverAccionPendiente(el.dataset.resolve, el.dataset.accion, f.id);
   }));
@@ -751,7 +820,7 @@ async function addAccion(fallaId) {
   const sel = accSel[fallaId] || [];
   if (!sel.length) { toast("Elige al menos una acción"); return; }
   const res = document.querySelector("[data-resseg='" + fallaId + "'] button.on").dataset.v;
-  const ts = new Date().toISOString();
+  const ts = accTime[fallaId] || new Date().toISOString();
   let existentes = [];
   if (navigator.onLine) {
     const { data } = await sb.from("acciones").select("*").eq("falla_id", fallaId);
@@ -789,6 +858,7 @@ async function addAccion(fallaId) {
 
   audit("registrar_acciones", { falla_id: fallaId, acciones: sel, resultado: res, nuevo_estado: nuevoEstado });
   accSel[fallaId] = [];
+  accTime[fallaId] = null;
   delete elegirCallbacks[fallaId];
   toast(nuevoEstado === "observacion" ? "Registrado · en observación" : "Registrado");
   await cargarMaestros();
