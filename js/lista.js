@@ -1,5 +1,14 @@
-let sortMode = "updated"; // "updated" | "created_desc" | "created_asc"
+let sortMode = localStorage.getItem("sortMode") || "urgencia";
 let filtroUrgentes = false;
+
+const SORT_OPTS = [
+  { id: "urgencia",     label: "⚡ Mayor urgencia",   desc: "Pendiente sin resolver más tiempo primero" },
+  { id: "updated",      label: "↕ Última actividad",  desc: "Con más cambios recientes al final" },
+  { id: "estado",       label: "📊 Por estado",        desc: "Pendientes → En observación" },
+  { id: "created_desc", label: "🆕 Más recientes",     desc: "Fallas nuevas primero" },
+  { id: "created_asc",  label: "📅 Más antiguas",      desc: "Fallas antiguas primero" },
+  { id: "mda",          label: "🔢 Por MDA",           desc: "Orden numérico ascendente" },
+];
 
 async function cargarLista() {
   if ($("buscarMda")) $("buscarMda").value = "";
@@ -35,11 +44,26 @@ async function cargarLista() {
   const arr = Object.values(grupos);
   arr.forEach(g => g.fallas.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
 
-  if (sortMode === "created_desc") {
+  const peorPend = g => g.fallas.filter(f => f.estado === "pendiente").sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))[0];
+  const estadoOrd = { pendiente: 0, observacion: 1 };
+  if (sortMode === "urgencia") {
+    arr.sort((a, b) => {
+      const pa = peorPend(a), pb = peorPend(b);
+      if (!pa && !pb) return 0; if (!pa) return 1; if (!pb) return -1;
+      return new Date(pa.updated_at) - new Date(pb.updated_at);
+    });
+  } else if (sortMode === "estado") {
+    arr.sort((a, b) => {
+      const ea = estadoOrd[a.fallas[0].estado] ?? 2, eb = estadoOrd[b.fallas[0].estado] ?? 2;
+      return ea !== eb ? ea - eb : new Date(a.fallas[0].updated_at) - new Date(b.fallas[0].updated_at);
+    });
+  } else if (sortMode === "created_desc") {
     arr.sort((a, b) => new Date(b.fallas[0].created_at) - new Date(a.fallas[0].created_at));
   } else if (sortMode === "created_asc") {
     arr.sort((a, b) => new Date(a.fallas[0].created_at) - new Date(b.fallas[0].created_at));
-  } else {
+  } else if (sortMode === "mda") {
+    arr.sort((a, b) => parseInt(a.mda) - parseInt(b.mda));
+  } else { // updated
     arr.sort((a, b) => new Date(a.fallas[0].updated_at) - new Date(b.fallas[0].updated_at));
   }
 
@@ -48,11 +72,33 @@ async function cargarLista() {
   cont.innerHTML = "";
 
   // Barra de ordenación
-  const sortLabels = { updated: "↕ Última actividad", created_desc: "↓ Más nuevas primero", created_asc: "↑ Más antiguas primero" };
+  const sortActual = SORT_OPTS.find(o => o.id === sortMode) || SORT_OPTS[0];
   const sortBar = document.createElement("div");
-  sortBar.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px";
-  sortBar.innerHTML = `<span style="font-size:13px;color:var(--muted)">${fallas.length} falla${fallas.length === 1 ? "" : "s"} activa${fallas.length === 1 ? "" : "s"}</span><button id="btnSort" style="background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer">${sortLabels[sortMode]}</button>`;
+  sortBar.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:relative";
+  sortBar.innerHTML = `
+    <span style="font-size:13px;color:var(--muted)">${fallas.length} falla${fallas.length === 1 ? "" : "s"} activa${fallas.length === 1 ? "" : "s"}</span>
+    <button id="btnSort" style="background:var(--panel2);border:1px solid var(--border);color:var(--txt);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px">
+      ${sortActual.label} <span style="color:var(--muted);font-size:10px">▾</span>
+    </button>
+    <div id="sortDropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;z-index:50;min-width:240px;overflow:hidden;box-shadow:0 4px 16px var(--shadow)"></div>`;
   cont.appendChild(sortBar);
+
+  const dropdown = sortBar.querySelector("#sortDropdown");
+  SORT_OPTS.forEach(o => {
+    const item = document.createElement("div");
+    item.style.cssText = `padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px;${o.id === sortMode ? "background:var(--panel2)" : ""}`;
+    item.innerHTML = `<span style="font-size:13px;font-weight:${o.id === sortMode ? "700" : "400"};color:${o.id === sortMode ? "var(--accent)" : "var(--txt)"}">${o.label}${o.id === sortMode ? " ✓" : ""}</span><span style="font-size:11px;color:var(--muted)">${o.desc}</span>`;
+    item.onmouseenter = () => { if (o.id !== sortMode) item.style.background = "var(--panel2)"; };
+    item.onmouseleave = () => { if (o.id !== sortMode) item.style.background = ""; };
+    item.onclick = e => { e.stopPropagation(); sortMode = o.id; localStorage.setItem("sortMode", sortMode); dropdown.style.display = "none"; cargarLista(); };
+    dropdown.appendChild(item);
+  });
+
+  sortBar.querySelector("#btnSort").onclick = e => {
+    e.stopPropagation();
+    dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
+  };
+  document.addEventListener("click", () => { dropdown.style.display = "none"; }, { once: true });
 
   if (desdeCacheLocal) {
     const cached = JSON.parse(localStorage.getItem("cache_fallas") || "{}");
@@ -62,10 +108,6 @@ async function cargarLista() {
     banner.textContent = navigator.onLine ? "Error al cargar datos frescos · mostrando cache de hace " + cacheAge : "Sin conexión · datos en caché de hace " + cacheAge;
     cont.insertBefore(banner, sortBar.nextSibling);
   }
-  sortBar.querySelector("#btnSort").onclick = () => {
-    sortMode = sortMode === "updated" ? "created_desc" : sortMode === "created_desc" ? "created_asc" : "updated";
-    cargarLista();
-  };
 
   // Badge de urgentes en header
   const horasUrgente = getCfg("horas_urgente", 2);
