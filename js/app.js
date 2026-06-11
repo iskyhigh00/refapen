@@ -227,28 +227,71 @@ const TEMAS_APP = [
   { id: "arena",      nombre: "Arena",       bg: "#faf6f1", accent: "#b45309" }
 ];
 
+const TAMANIOS_APP = [
+  { id: "s",  label: "A",  desc: "Pequeño",  fs: "13px" },
+  { id: "m",  label: "A",  desc: "Normal",   fs: "15px" },
+  { id: "l",  label: "A",  desc: "Grande",   fs: "18px" },
+  { id: "xl", label: "A",  desc: "Extra",    fs: "22px" }
+];
+
+function aplicarTamano(id) {
+  if (id === "m") document.documentElement.removeAttribute("data-size");
+  else document.documentElement.setAttribute("data-size", id);
+}
+
 function abrirSelectorTema() {
   const ov = document.createElement("div");
   ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px";
   const box = document.createElement("div");
   box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:320px";
-  const actual = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
-  box.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:16px">Tema visual</div>`;
-  const grid = document.createElement("div");
-  grid.style.cssText = "display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px";
+  const temaActual = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
+  const tamActual = localStorage.getItem("size_" + tecnico) || "m";
+
+  box.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:16px">Apariencia</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Color</div>`;
+
+  // Colores
+  const gridTemas = document.createElement("div");
+  gridTemas.style.cssText = "display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px";
   TEMAS_APP.forEach(t => {
     const btn = document.createElement("div");
-    btn.style.cssText = `background:${t.bg};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid ${t.id === actual ? t.accent : "transparent"};transition:.15s`;
-    btn.innerHTML = `<div style="width:18px;height:18px;border-radius:50%;background:${t.accent};margin:0 auto 6px"></div><span style="font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)">${t.nombre}</span>`;
+    btn.style.cssText = `background:${t.bg};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid ${t.id === temaActual ? t.accent : "transparent"};transition:.15s`;
+    btn.innerHTML = `<div style="width:18px;height:18px;border-radius:50%;background:${t.accent};margin:0 auto 6px"></div><span style="font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)">${t.nombre}</span>`;
     btn.onclick = () => {
       document.documentElement.setAttribute("data-theme", t.id);
       localStorage.setItem("tema_" + tecnico, t.id);
       audit("cambiar_tema", { tema: t.id });
-      ov.remove();
+      gridTemas.querySelectorAll("div").forEach(b => b.style.borderColor = "transparent");
+      btn.style.borderColor = t.accent;
     };
-    grid.appendChild(btn);
+    gridTemas.appendChild(btn);
   });
-  box.appendChild(grid);
+  box.appendChild(gridTemas);
+
+  // Tamaño
+  const labelTam = document.createElement("div");
+  labelTam.style.cssText = "font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px";
+  labelTam.textContent = "Tamaño";
+  box.appendChild(labelTam);
+
+  const gridTam = document.createElement("div");
+  gridTam.style.cssText = "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px";
+  TAMANIOS_APP.forEach(t => {
+    const btn = document.createElement("div");
+    const activo = t.id === tamActual;
+    btn.style.cssText = `border:2px solid ${activo ? "var(--accent)" : "var(--border)"};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:.15s`;
+    btn.innerHTML = `<div style="font-size:${t.fs};font-weight:700;color:var(--txt);line-height:1;margin-bottom:4px">${t.label}</div><span style="font-size:10px;color:var(--muted)">${t.desc}</span>`;
+    btn.onclick = () => {
+      aplicarTamano(t.id);
+      localStorage.setItem("size_" + tecnico, t.id);
+      audit("cambiar_tamano", { tamano: t.id });
+      gridTam.querySelectorAll("div").forEach(b => b.style.borderColor = "var(--border)");
+      btn.style.borderColor = "var(--accent)";
+    };
+    gridTam.appendChild(btn);
+  });
+  box.appendChild(gridTam);
+
   const btnCerrar = document.createElement("button");
   btnCerrar.className = "btn btn-sec";
   btnCerrar.style.marginTop = "0";

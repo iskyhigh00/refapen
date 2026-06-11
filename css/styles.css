@@ -45,6 +45,9 @@
 input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
 html,body{height:100%}
 body{background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;overflow-x:hidden;transition:background .3s,color .3s}
+[data-size="s"]  body { zoom: 0.85; }
+[data-size="l"]  body { zoom: 1.15; }
+[data-size="xl"] body { zoom: 1.3;  }
 .hidden{display:none!important}
 
 /* === HEADER === */

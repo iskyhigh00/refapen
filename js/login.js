@@ -101,9 +101,11 @@ async function iniciar() {
   $("login").classList.add("hidden");
   $("app").classList.remove("hidden");
   $("tecNombre").textContent = tecnico;
-  // Aplicar tema del usuario
+  // Aplicar tema y tamaño del usuario
   const temaUser = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
   document.documentElement.setAttribute("data-theme", temaUser);
+  const tamUser = localStorage.getItem("size_" + tecnico) || "m";
+  aplicarTamano(tamUser);
   if (isObrist) {
     $("btnStats").classList.remove("hidden");
     $("btnAdmin").classList.remove("hidden");
