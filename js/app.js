@@ -218,6 +218,50 @@ function cambiarTecnico() {
 $("badgeTec").onclick = cambiarTecnico;
 $("mdaTecBadge").onclick = e => { e.stopPropagation(); cambiarTecnico(); };
 
+// selector de tema
+const TEMAS_APP = [
+  { id: "oscuro",     nombre: "Oscuro",      bg: "#0d1117", accent: "#2f81f7" },
+  { id: "medianoche", nombre: "Violeta",     bg: "#0b0e14", accent: "#7c3aed" },
+  { id: "oceano",     nombre: "Océano",      bg: "#0f172a", accent: "#06b6d4" },
+  { id: "claro",      nombre: "Claro",       bg: "#f5f6f8", accent: "#2563eb" },
+  { id: "arena",      nombre: "Arena",       bg: "#faf6f1", accent: "#b45309" }
+];
+
+function abrirSelectorTema() {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:320px";
+  const actual = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
+  box.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:16px">Tema visual</div>`;
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px";
+  TEMAS_APP.forEach(t => {
+    const btn = document.createElement("div");
+    btn.style.cssText = `background:${t.bg};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid ${t.id === actual ? t.accent : "transparent"};transition:.15s`;
+    btn.innerHTML = `<div style="width:18px;height:18px;border-radius:50%;background:${t.accent};margin:0 auto 6px"></div><span style="font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)">${t.nombre}</span>`;
+    btn.onclick = () => {
+      document.documentElement.setAttribute("data-theme", t.id);
+      localStorage.setItem("tema_" + tecnico, t.id);
+      audit("cambiar_tema", { tema: t.id });
+      ov.remove();
+    };
+    grid.appendChild(btn);
+  });
+  box.appendChild(grid);
+  const btnCerrar = document.createElement("button");
+  btnCerrar.className = "btn btn-sec";
+  btnCerrar.style.marginTop = "0";
+  btnCerrar.textContent = "Cerrar";
+  btnCerrar.onclick = () => ov.remove();
+  box.appendChild(btnCerrar);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
+$("btnTema").onclick = abrirSelectorTema;
+
 // arranque
 pintarLogin();
 if (tecnico) iniciar();

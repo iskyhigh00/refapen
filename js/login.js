@@ -101,6 +101,9 @@ async function iniciar() {
   $("login").classList.add("hidden");
   $("app").classList.remove("hidden");
   $("tecNombre").textContent = tecnico;
+  // Aplicar tema del usuario
+  const temaUser = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
+  document.documentElement.setAttribute("data-theme", temaUser);
   if (isObrist) {
     $("btnStats").classList.remove("hidden");
     $("btnAdmin").classList.remove("hidden");

@@ -56,7 +56,7 @@ async function cargarObrist() {
     { id: "claro",      nombre: "Claro",    bg: "#f5f6f8", txt: "#1f2937", accent: "#2563eb" },
     { id: "arena",      nombre: "Arena",    bg: "#faf6f1", txt: "#3d3529", accent: "#b45309" }
   ];
-  const temaActual = localStorage.getItem("tema_fallas") || "oscuro";
+  const temaActual = localStorage.getItem("tema_" + tecnico) || localStorage.getItem("tema_fallas") || "oscuro";
 
   const subApariencia = document.createElement("div");
   subApariencia.innerHTML = `<div class="obr-sub-label">Tema visual</div>`;
@@ -71,7 +71,7 @@ async function cargarObrist() {
     btn.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:${t.accent};margin:0 auto 6px"></div>${t.nombre}`;
     btn.onclick = () => {
       document.documentElement.setAttribute("data-theme", t.id);
-      localStorage.setItem("tema_fallas", t.id);
+      localStorage.setItem("tema_" + tecnico, t.id);
       grid.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       audit("cambiar_tema", { tema: t.id });
