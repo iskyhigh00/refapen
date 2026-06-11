@@ -305,6 +305,94 @@ function abrirSelectorTema() {
 
 $("btnTema").onclick = abrirSelectorTema;
 
+async function abrirDeshacer() {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto";
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  box.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0">Cargando…</p>';
+
+  const { data: accs } = await sb.from("acciones")
+    .select("*, mdas_fallas(mda, falla)")
+    .eq("tecnico", tecnico)
+    .eq("anulada", false)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (!accs?.length) {
+    box.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:12px">↩ Deshacer</div>
+      <p style="color:var(--muted);font-size:13px">No hay acciones recientes tuyas para deshacer.</p>
+      <button class="btn btn-sec" style="margin-top:16px">Cerrar</button>`;
+    box.querySelector("button").onclick = () => ov.remove();
+    return;
+  }
+
+  const sel = new Set();
+
+  function render() {
+    box.innerHTML = `
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">↩ Deshacer</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Seleccioná las acciones a deshacer. El historial de auditoría se mantiene.</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-sec btn-sm" id="undoUlt1" style="margin:0">Última</button>
+        <button class="btn btn-sec btn-sm" id="undoUlt3" style="margin:0">Últimas 3</button>
+        <button class="btn btn-sec btn-sm" id="undoHoy" style="margin:0">Todas de hoy</button>
+      </div>
+      <div id="undoLista"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-danger" id="undoOk" style="margin:0;${sel.size?'':'opacity:.4'}" ${sel.size?'':'disabled'}>Deshacer${sel.size?' '+sel.size:''}</button>
+        <button class="btn btn-sec" id="undoCancel" style="margin:0">Cancelar</button>
+      </div>`;
+
+    box.querySelector("#undoUlt1").onclick = () => { sel.clear(); if (accs[0]) sel.add(accs[0].id); render(); };
+    box.querySelector("#undoUlt3").onclick = () => { sel.clear(); accs.slice(0,3).forEach(a => sel.add(a.id)); render(); };
+    box.querySelector("#undoHoy").onclick = () => {
+      sel.clear();
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      accs.filter(a => new Date(a.created_at) >= hoy).forEach(a => sel.add(a.id));
+      render();
+    };
+
+    const lista = box.querySelector("#undoLista");
+    accs.forEach(a => {
+      const checked = sel.has(a.id);
+      const resColor = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
+      const resLabel = a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente";
+      const row = document.createElement("div");
+      row.style.cssText = `padding:10px;border:1px solid ${checked?"var(--accent)":"var(--border)"};border-radius:8px;margin-bottom:6px;cursor:pointer;${checked?"background:rgba(47,129,247,.08)":""}`;
+      row.innerHTML = `<div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" ${checked?"checked":""} style="width:16px;height:16px;flex:none;accent-color:var(--accent)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.accion)}</div>
+          <div style="font-size:11px;color:var(--muted)">MDA ${a.mdas_fallas?.mda||"?"} · hace ${tiempoDesde(a.created_at)}</div>
+        </div>
+        <span style="color:${resColor};font-size:11px;font-weight:700;flex:none">${resLabel}</span>
+      </div>`;
+      row.onclick = () => { if (sel.has(a.id)) sel.delete(a.id); else sel.add(a.id); render(); };
+      lista.appendChild(row);
+    });
+
+    box.querySelector("#undoOk").onclick = async () => {
+      if (!sel.size) return;
+      const n = sel.size;
+      if (!await confirmar(`¿Deshacer ${n} acción${n>1?"es":""}? El historial de auditoría se mantiene.`, { ok: "Deshacer", danger: true })) return;
+      for (const id of sel) await sb.from("acciones").update({ anulada: true }).eq("id", id);
+      audit("deshacer_acciones", { ids: [...sel], cantidad: n });
+      ov.remove();
+      toast(`${n} acción${n>1?"es":""} deshecha${n>1?"s":""}`);
+      cargarLista();
+    };
+    box.querySelector("#undoCancel").onclick = () => ov.remove();
+  }
+
+  render();
+}
+
+$("btnDeshacer").onclick = abrirDeshacer;
+
 // arranque
 pintarLogin();
 if (tecnico) iniciar();

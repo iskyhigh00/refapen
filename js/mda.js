@@ -1,6 +1,96 @@
 const accSel = {};
 const elegirCallbacks = {};
 
+async function editarFalla(f) {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:92vh;overflow-y:auto";
+  const tecOpts = TECNICOS.map(t => `<option value="${esc(t)}"${t===f.tecnico?" selected":""}>${esc(t)}</option>`).join("");
+  box.innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Editar falla</div>
+    <label>Descripción</label>
+    <textarea id="edFalla" style="min-height:60px">${esc(f.falla)}</textarea>
+    <label>Estado</label>
+    <select id="edEstado">
+      <option value="pendiente"${f.estado==="pendiente"?" selected":""}>Pendiente</option>
+      <option value="observacion"${f.estado==="observacion"?" selected":""}>En observación</option>
+      <option value="resuelta"${f.estado==="resuelta"?" selected":""}>Resuelta</option>
+    </select>
+    <label>Técnico</label>
+    <select id="edTecnico">${tecOpts}</select>
+    <label>MDA</label>
+    <input id="edMda" value="${esc(f.mda)}" inputmode="numeric" maxlength="6">
+    <label>Isla</label>
+    <input id="edIsla" value="${esc(f.isla)}">
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-ok" id="edGuardar" style="margin:0">Guardar</button>
+      <button class="btn btn-sec" id="edCancelar" style="margin:0">Cancelar</button>
+    </div>`;
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  box.querySelector("#edCancelar").onclick = () => ov.remove();
+  box.querySelector("#edGuardar").onclick = async () => {
+    const falla = box.querySelector("#edFalla").value.trim();
+    const estado = box.querySelector("#edEstado").value;
+    const tecnicoVal = box.querySelector("#edTecnico").value;
+    const mdaVal = mda6(box.querySelector("#edMda").value);
+    const islaVal = box.querySelector("#edIsla").value.trim();
+    if (!falla) { toast("La descripción no puede estar vacía"); return; }
+    const { error } = await sb.from("mdas_fallas").update({ falla, estado, tecnico: tecnicoVal, mda: mdaVal, isla: islaVal, updated_at: new Date().toISOString() }).eq("id", f.id);
+    if (error) { toast("Error: " + error.message); return; }
+    audit("editar_falla", { id: f.id, falla, estado, mda: mdaVal });
+    toast("Guardado");
+    ov.remove();
+    cargarLista();
+    abrirMda(mdaVal);
+  };
+}
+
+async function editarAccion(a, mdaNum) {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:380px";
+  const tecOpts = TECNICOS.map(t => `<option value="${esc(t)}"${t===a.tecnico?" selected":""}>${esc(t)}</option>`).join("");
+  box.innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Editar acción</div>
+    <label>Texto</label>
+    <input id="eaAccion" value="${esc(a.accion)}">
+    <label>Resultado</label>
+    <select id="eaResultado">
+      <option value="resolvio"${a.resultado==="resolvio"?" selected":""}>Resolvió ✓</option>
+      <option value="no_resolvio"${a.resultado==="no_resolvio"?" selected":""}>No resolvió ✗</option>
+      <option value="pendiente"${a.resultado==="pendiente"?" selected":""}>Pendiente →</option>
+    </select>
+    <label>Técnico</label>
+    <select id="eaTecnico">${tecOpts}</select>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-ok" id="eaGuardar" style="margin:0">Guardar</button>
+      <button class="btn btn-danger" id="eaAnular" style="margin:0">Anular</button>
+      <button class="btn btn-sec" id="eaCancelar" style="margin:0">Cancelar</button>
+    </div>`;
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  box.querySelector("#eaCancelar").onclick = () => ov.remove();
+  box.querySelector("#eaGuardar").onclick = async () => {
+    const accion = box.querySelector("#eaAccion").value.trim();
+    const resultado = box.querySelector("#eaResultado").value;
+    const tecnicoVal = box.querySelector("#eaTecnico").value;
+    if (!accion) { toast("El texto no puede estar vacío"); return; }
+    const { error } = await sb.from("acciones").update({ accion, resultado, tecnico: tecnicoVal }).eq("id", a.id);
+    if (error) { toast("Error: " + error.message); return; }
+    audit("editar_accion", { id: a.id, accion, resultado });
+    toast("Guardado"); ov.remove(); abrirMda(mdaNum);
+  };
+  box.querySelector("#eaAnular").onclick = async () => {
+    if (!await confirmar("¿Anular esta acción? Quedará tachada pero visible en el historial.", { ok: "Anular", danger: true })) return;
+    await sb.from("acciones").update({ anulada: true }).eq("id", a.id);
+    audit("anular_accion_obrist", { id: a.id });
+    toast("Anulada"); ov.remove(); abrirMda(mdaNum);
+  };
+}
+
 async function buscarSugerencias(fallaTexto, fallaId) {
   if (!navigator.onLine) return [];
   const palabras = fallaTexto.toLowerCase().replace(/[^a-záéíóúñü0-9\s]/g, "").split(/\s+/).filter(p => p.length > 2);
@@ -359,7 +449,10 @@ async function abrirMda(mdaNum) {
         card.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;opacity:.85";
         let accsHtml = acciones.filter(a => !a.anulada).map(a => {
           const tag = a.resultado === "resolvio" ? "var(--ok)" : a.resultado === "no_resolvio" ? "var(--danger)" : "var(--warn)";
-          return `<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between"><span>${esc(a.accion)}</span><span style="color:${tag};font-weight:700;font-size:11px">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span></div>`;
+          return `<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" ${isObrist?`data-hist-accid="${a.id}"`:""}>
+            <span>${esc(a.accion)}</span>
+            <span style="color:${tag};font-weight:700;font-size:11px;flex:none;margin-left:8px">${a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</span>
+          </div>`;
         }).join("");
         card.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
@@ -368,6 +461,24 @@ async function abrirMda(mdaNum) {
           </div>
           ${accsHtml || '<div style="font-size:12px;color:var(--muted)">Sin acciones registradas</div>'}
           <div style="font-size:11px;color:var(--muted);margin-top:6px">Resuelta el ${fmtFecha(f.updated_at)}</div>`;
+        if (isObrist) {
+          const btnEF = document.createElement("button");
+          btnEF.className = "btn btn-sec btn-sm";
+          btnEF.style.cssText = "margin-top:10px;font-size:12px";
+          btnEF.textContent = "✏️ Editar falla";
+          btnEF.onclick = () => editarFalla(f);
+          card.appendChild(btnEF);
+          card.querySelectorAll("[data-hist-accid]").forEach(el => {
+            const acc = acciones.find(a => String(a.id) === el.dataset.histAccid);
+            if (!acc) return;
+            const eb = document.createElement("button");
+            eb.className = "btn btn-sec btn-sm";
+            eb.style.cssText = "margin-left:6px;font-size:10px;padding:1px 6px;flex:none";
+            eb.textContent = "✏️";
+            eb.onclick = e => { e.stopPropagation(); editarAccion(acc, mdaNum); };
+            el.appendChild(eb);
+          });
+        }
         contenido.appendChild(card);
       }
       if (!resueltas.length) contenido.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin historial previo.</p>';
@@ -406,7 +517,7 @@ function renderFalla(f, acciones) {
     const hist = a.historial_resultados
       ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${resText} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
     const clickable = (!a.anulada && a.resultado === "pendiente") ? `style="cursor:pointer" data-resolve="${a.id}" data-accion="${esc(a.accion)}"` : "";
-    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span>${a.resultado === "pendiente" ? ' <span style="color:var(--warn);font-size:11px">· toca para registrar resultado</span>' : ''}</div>${hist}</div>`;
+    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" data-accid="${a.id}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span>${a.resultado === "pendiente" ? ' <span style="color:var(--warn);font-size:11px">· toca para registrar resultado</span>' : ''}</div>${hist}</div>`;
   }
 
   let pendientesHtml = "";
@@ -494,6 +605,32 @@ function renderFalla(f, acciones) {
   // Fotos
   const fotoInput = div.querySelector("[data-fotoinput='" + f.id + "']");
   if (fotoInput) fotoInput.onchange = e => { const file = e.target.files[0]; if (file) subirFoto(f.id, file); };
+
+  // Obrist: controles de edición
+  if (isObrist) {
+    const bar = document.createElement("div");
+    bar.style.cssText = "margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap";
+    const btnEF = document.createElement("button");
+    btnEF.className = "btn btn-sec btn-sm";
+    btnEF.style.fontSize = "12px";
+    btnEF.textContent = "✏️ Editar falla";
+    btnEF.onclick = () => editarFalla(f);
+    bar.appendChild(btnEF);
+    const metaEl = div.querySelector(".meta");
+    if (metaEl) metaEl.insertAdjacentElement("afterend", bar);
+    // Botón de editar en cada acción
+    div.querySelectorAll("[data-accid]").forEach(el => {
+      const acc = acciones.find(a => String(a.id) === el.dataset.accid);
+      if (!acc) return;
+      const eb = document.createElement("button");
+      eb.className = "btn btn-sec btn-sm";
+      eb.style.cssText = "margin:5px 0 0;font-size:11px;padding:2px 8px";
+      eb.textContent = "✏️ editar";
+      eb.onclick = e => { e.stopPropagation(); editarAccion(acc, f.mda); };
+      el.appendChild(eb);
+    });
+  }
+
   return div;
 }
 
