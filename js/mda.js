@@ -709,6 +709,19 @@ function renderFalla(f, acciones) {
       eb.textContent = "✏️ editar";
       eb.onclick = e => { e.stopPropagation(); editarAccion(acc, f.mda); };
       el.appendChild(eb);
+      const db = document.createElement("button");
+      db.className = "btn btn-sm";
+      db.style.cssText = "margin:5px 0 0 4px;font-size:11px;padding:2px 8px;background:none;border:1px solid var(--danger);color:var(--danger)";
+      db.textContent = "🗑️ borrar";
+      db.onclick = async e => {
+        e.stopPropagation();
+        if (!await confirmar(`¿Borrar permanentemente "${acc.accion}"? No se puede deshacer.`, { ok: "Borrar", danger: true })) return;
+        await sb.from("acciones").delete().eq("id", acc.id);
+        audit("borrar_accion", { id: acc.id, accion: acc.accion });
+        toast("Acción borrada");
+        abrirMda(f.mda);
+      };
+      el.appendChild(db);
     });
   }
 
