@@ -218,6 +218,8 @@ function cambiarTecnico() {
   confirmar("¿Cambiar de técnico?", { ok: "Cambiar" }).then(ok => {
     if (!ok) return;
     audit("logout", { tecnico });
+    // Cerrar cualquier pantalla abierta antes de mostrar el login
+    SCREENS.forEach(id => $(id).classList.add("hidden"));
     $("app").classList.add("hidden");
     $("login").classList.remove("hidden");
     pintarLogin();
