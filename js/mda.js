@@ -895,24 +895,68 @@ async function addAccion(fallaId) {
 }
 
 function resolverAccionPendiente(accionId, nombre, fallaId) {
+  const OPCIONES = [
+    { label: "15 min",  ms: 15 * 60000 },
+    { label: "30 min",  ms: 30 * 60000 },
+    { label: "1 hora",  ms: 3600000 },
+    { label: "2 horas", ms: 2 * 3600000 },
+    { label: "3 horas", ms: 3 * 3600000 },
+    { label: "6 horas", ms: 6 * 3600000 },
+    { label: "12 horas",ms: 12 * 3600000 },
+    { label: "1 día",   ms: 24 * 3600000 },
+  ];
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const nowStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px";
   overlay.innerHTML = `
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:360px">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:380px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(nombre)}</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:20px">¿Cómo quedó esta acción?</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">¿Cómo quedó esta acción?</div>
       <button class="btn btn-ok" id="oRes" style="margin-top:0">✓ Resolvió</button>
       <button class="btn btn-danger" id="oNoRes" style="margin-top:10px">✗ No resolvió</button>
-      <button class="btn btn-sec" id="oCancelar" style="margin-top:10px">Cancelar</button>
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">⏱ ¿Cuándo lo hiciste?</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="rOpts"></div>
+        <input type="datetime-local" id="rCustom" value="${nowStr}" style="margin-bottom:8px">
+        <button class="btn btn-sec btn-sm" id="rCustomOk" style="margin:0">Usar esta fecha</button>
+        <div id="rTsLabel" style="font-size:12px;color:var(--warn);margin-top:8px;min-height:16px"></div>
+      </div>
+      <button class="btn btn-sec" id="oCancelar" style="margin-top:12px">Cancelar</button>
     </div>`;
   document.body.appendChild(overlay);
+
+  let tsElegido = null;
+
+  const optsEl = overlay.querySelector("#rOpts");
+  OPCIONES.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "btn btn-sec btn-sm"; b.style.margin = "0";
+    b.textContent = `Hace ${o.label}`;
+    b.onclick = () => {
+      tsElegido = new Date(Date.now() - o.ms).toISOString();
+      overlay.querySelector("#rTsLabel").textContent = `Registrará hace ${o.label}`;
+    };
+    optsEl.appendChild(b);
+  });
+
+  overlay.querySelector("#rCustomOk").onclick = () => {
+    const val = overlay.querySelector("#rCustom").value;
+    if (!val) return;
+    const fecha = new Date(val);
+    if (isNaN(fecha) || fecha > new Date()) { toast("Fecha inválida o en el futuro"); return; }
+    tsElegido = fecha.toISOString();
+    overlay.querySelector("#rTsLabel").textContent = `Registrará: ${fmtFecha(tsElegido)}`;
+  };
+
   overlay.querySelector("#oCancelar").onclick = () => overlay.remove();
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
 
   async function aplicar(res) {
     overlay.remove();
-    const ts = new Date().toISOString();
-    // Obtener datos originales para preservar quién sugirió
+    const ts = tsElegido || new Date().toISOString();
     const { data: orig } = await sb.from("acciones").select("*").eq("id", accionId).single();
     const resLabelOrig = { resolvio: "resolvió", no_resolvio: "no resolvió", pendiente: "sugerencia" };
     const rastro = (orig?.historial_resultados ? orig.historial_resultados + " → " : "") + `${resLabelOrig[orig?.resultado] || "sugerencia"} (${orig?.tecnico} · ${fmtFecha(orig?.created_at)})`;
