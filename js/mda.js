@@ -446,6 +446,99 @@ function abrirGaleria(urls, index) {
   mostrar();
 }
 
+function exportarInformeFalla(f, acciones) {
+  const estLabel = { pendiente: "Pendiente", observacion: "En observación", resuelta: "Resuelta" }[f.estado] || f.estado;
+  const accsNoAnuladas = acciones.filter(a => !a.anulada);
+  const accsAnuladas = acciones.filter(a => a.anulada);
+
+  const filaAcc = a => {
+    const resText = a.accion === "⟲ Volvió a fallar" || a.accion.startsWith("⟲") ? "reincidencia"
+      : a.resultado === "resolvio" ? "Resolvió ✓"
+      : a.resultado === "no_resolvio" ? "No resolvió ✗"
+      : "Pendiente de probar →";
+    const hist = a.historial_resultados
+      ? `<div style="font-size:11px;color:#666;margin-top:4px;padding-left:8px;border-left:2px solid #ddd">${a.historial_resultados.split(" → ").map((h,i)=>`${i+1}. ${h}`).join("<br>")}</div>`
+      : "";
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:13px">${esc(a.accion)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:13px;white-space:nowrap;font-weight:600;color:${a.resultado==="resolvio"?"#16a34a":a.resultado==="no_resolvio"?"#dc2626":"#d97706"}">${resText}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;white-space:nowrap">${esc(a.tecnico)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;white-space:nowrap">${fmtFecha(a.created_at)}</td>
+    </tr>${hist ? `<tr><td colspan="4" style="padding:2px 10px 8px;border-bottom:1px solid #eee">${hist}</td></tr>` : ""}`;
+  };
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Informe Falla MDA ${f.mda}</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1a1a1a}
+    h1{font-size:22px;margin-bottom:4px}
+    .sub{color:#666;font-size:13px;margin-bottom:24px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th{background:#f4f4f4;padding:8px 10px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #ddd}
+    .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700}
+    .pendiente{background:#fef3c7;color:#92400e}
+    .observacion{background:#dbeafe;color:#1e40af}
+    .resuelta{background:#dcfce7;color:#166534}
+    .section{margin-top:28px}
+    .section h2{font-size:15px;border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:0}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-top:12px;font-size:13px}
+    .meta-grid dt{color:#666;margin:0}
+    .meta-grid dd{margin:0;font-weight:500}
+    .desc{background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:14px;font-size:15px;margin-top:12px}
+    .anuladas{opacity:.6}
+    @media print{body{margin:20px auto}.no-print{display:none}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:start">
+    <div>
+      <h1>Informe de Falla — MDA ${f.mda} · isla ${f.isla}</h1>
+      <div class="sub">Generado el ${fmtFecha(new Date().toISOString())} · Fallas MDA</div>
+    </div>
+    <button class="no-print" onclick="window.print()" style="padding:8px 18px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">🖨 Imprimir / PDF</button>
+  </div>
+
+  <div class="section">
+    <h2>Datos generales</h2>
+    <dl class="meta-grid">
+      <dt>Estado</dt><dd><span class="badge ${f.estado}">${estLabel}</span></dd>
+      <dt>MDA</dt><dd>${f.mda}</dd>
+      <dt>Isla</dt><dd>${f.isla}</dd>
+      <dt>Técnico que reportó</dt><dd>${esc(f.tecnico)}</dd>
+      <dt>Fecha de creación</dt><dd>${fmtFecha(f.created_at)}</dd>
+      <dt>Última actualización</dt><dd>${fmtFecha(f.updated_at)}</dd>
+    </dl>
+  </div>
+
+  <div class="section">
+    <h2>Descripción de la falla</h2>
+    <div class="desc">${esc(f.falla)}</div>
+  </div>
+
+  ${accsNoAnuladas.length ? `
+  <div class="section">
+    <h2>Acciones registradas (${accsNoAnuladas.length})</h2>
+    <table>
+      <thead><tr><th>Acción</th><th>Resultado</th><th>Técnico</th><th>Fecha</th></tr></thead>
+      <tbody>${accsNoAnuladas.map(filaAcc).join("")}</tbody>
+    </table>
+  </div>` : ""}
+
+  ${accsAnuladas.length ? `
+  <div class="section anuladas">
+    <h2>Acciones anuladas (${accsAnuladas.length})</h2>
+    <table>
+      <thead><tr><th>Acción</th><th>Resultado</th><th>Técnico</th><th>Fecha</th></tr></thead>
+      <tbody>${accsAnuladas.map(filaAcc).join("")}</tbody>
+    </table>
+  </div>` : ""}
+
+  <div style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Fallas MDA · ${fmtFecha(new Date().toISOString())}</div>
+  </body></html>`;
+
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(html); w.document.close(); }
+  else toast("Permite ventanas emergentes para exportar");
+}
+
 async function abrirMda(mdaNum) {
   mdaActual = mdaNum;
   abrirPantalla("scrMda");
@@ -597,7 +690,7 @@ function renderFalla(f, acciones) {
     const hist = a.historial_resultados
       ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${resText} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
     const clickable = (!a.anulada && a.resultado === "pendiente") ? `style="cursor:pointer" data-resolve="${a.id}" data-accion="${esc(a.accion)}"` : "";
-    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" data-accid="${a.id}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · hace ${tiempoDesde(a.created_at)} <span style="color:var(--border)">·</span> <span style="font-size:10px">${fmtFecha(a.created_at)}</span>${a.resultado === "pendiente" ? ' <span style="color:var(--warn);font-size:11px">· toca para registrar resultado</span>' : ''}</div>${hist}</div>`;
+    return `<div class="accion-item${a.anulada ? ' anulada' : ''}" data-accid="${a.id}" ${clickable}><div class="a-head"><span>${esc(a.accion)}</span><span class="res-tag res-${a.resultado}">${resText}</span></div><div class="accion-meta">${a.tecnico} · ${fmtFecha(a.created_at)}${a.resultado === "pendiente" ? ' <span style="color:var(--warn);font-size:11px">· toca para registrar resultado</span>' : ''}</div>${hist}</div>`;
   }
 
   let pendientesHtml = "";
@@ -695,10 +788,22 @@ function renderFalla(f, acciones) {
   const fotoInput = div.querySelector("[data-fotoinput='" + f.id + "']");
   if (fotoInput) fotoInput.onchange = e => { const file = e.target.files[0]; if (file) subirFoto(f.id, file); };
 
+  // Botón exportar — visible para todos
+  const exportBar = document.createElement("div");
+  exportBar.style.cssText = "margin:6px 0 8px";
+  const btnExp = document.createElement("button");
+  btnExp.className = "btn btn-sec btn-sm";
+  btnExp.style.cssText = "font-size:12px";
+  btnExp.textContent = "↓ Exportar informe";
+  btnExp.onclick = () => exportarInformeFalla(f, acciones);
+  exportBar.appendChild(btnExp);
+  const metaElExp = div.querySelector(".meta");
+  if (metaElExp) metaElExp.insertAdjacentElement("afterend", exportBar);
+
   // Obrist: controles de edición
   if (isObrist) {
     const bar = document.createElement("div");
-    bar.style.cssText = "margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap";
+    bar.style.cssText = "margin:4px 0 10px;display:flex;gap:6px;flex-wrap:wrap";
     const btnEF = document.createElement("button");
     btnEF.className = "btn btn-sec btn-sm";
     btnEF.style.fontSize = "12px";
