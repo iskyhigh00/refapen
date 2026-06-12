@@ -144,8 +144,14 @@ $("fabNueva").onclick = () => {
   $("nFotosPreview").innerHTML = "";
   $("nFotos").value = "";
   $("guardarFalla").disabled = true;
+  accTime["_nueva"] = null;
+  $("btnTiempoFalla").textContent = "⏱ Ocurrió ahora";
+  $("btnTiempoFalla").style.color = "";
+  $("btnTiempoFalla").style.borderColor = "";
   abrirPantalla("scrNueva");
 };
+
+$("btnTiempoFalla").onclick = () => abrirSelectorTiempo("_nueva", $("btnTiempoFalla"));
 
 $("nFotos").onchange = () => {
   const preview = $("nFotosPreview");
@@ -166,7 +172,9 @@ $("guardarFalla").onclick = async () => {
   if (!p.ok) { toast("Isla inválida"); return; }
   if (!falla) { toast("Falta la falla"); return; }
   const isla = p.valor;
-  const d = { mda, isla, falla, estado: "pendiente", tecnico, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const ts = accTime["_nueva"] || new Date().toISOString();
+  accTime["_nueva"] = null;
+  const d = { mda, isla, falla, estado: "pendiente", tecnico, created_at: ts, updated_at: ts };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").insert(d);
     if (error) { cola.push({ id: uid(), t: "falla", d }); guardarCola(); }
