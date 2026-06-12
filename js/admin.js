@@ -120,6 +120,12 @@ async function cargarAdmin() {
       audit(activa ? "desactivar_accion" : "activar_accion", { id: b.dataset.delAcc });
       cargarAdmin(); cargarMaestros();
     });
+    lista.querySelectorAll("[data-pieza-acc]").forEach(b => b.onclick = async () => {
+      const actual = b.dataset.pieza === "true";
+      await sb.from("catalogo_acciones").update({ pregunta_pieza: !actual }).eq("id", b.dataset.piezaAcc);
+      audit("toggle_pregunta_pieza", { id: b.dataset.piezaAcc, valor: !actual });
+      cargarAdmin(); cargarMaestros();
+    });
     lista.querySelectorAll("[data-uso-acc]").forEach(inp => {
       inp.onchange = async () => {
         const accion = inp.dataset.usoAcc;
@@ -134,10 +140,12 @@ async function cargarAdmin() {
 
   function crearFilaAccion(c) {
     const uso = usoMap[c.accion] || 0;
+    const pieza = !!c.pregunta_pieza;
     const row = document.createElement("div");
     row.className = "admin-item";
     row.innerHTML = `
       <span style="${c.activa ? '' : 'text-decoration:line-through;color:var(--muted)'};flex:1">${esc(c.accion)}</span>
+      <button class="btn-icon" data-pieza-acc="${c.id}" data-pieza="${pieza}" title="¿Pregunta nueva/usada?" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid ${pieza ? 'var(--ok)' : 'var(--border)'};color:${pieza ? 'var(--ok)' : 'var(--muted)'};white-space:nowrap">${pieza ? '🔩✓' : '🔩'}</button>
       <input type="number" data-uso-acc="${esc(c.accion)}" value="${uso}" min="0" style="width:55px;text-align:center;padding:4px;font-size:13px;font-weight:700;margin:0;color:${uso > 0 ? 'var(--ok)' : 'var(--muted)'}">
       <button class="btn-icon btn-edit" data-edit-acc="${c.id}" data-val="${esc(c.accion)}">✏️</button>
       <button class="btn-icon btn-del" data-del-acc="${c.id}" data-activa="${c.activa}">${c.activa ? '🗑️' : '↩️'}</button>`;

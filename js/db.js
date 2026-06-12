@@ -5,6 +5,7 @@ let TECNICOS_DATA = [];
 let ACCIONES = {};
 let TODAS = [];
 let TOP_ACCIONES = [];
+let ACCIONES_PIEZA = new Set(); // acciones que preguntan nueva/usada
 
 async function cargarMaestros() {
   const [{ data: tecs, error: eTecs }, { data: cats, error: eCats }] = await Promise.all([
@@ -16,9 +17,11 @@ async function cargarMaestros() {
   TECNICOS_DATA = tecs || [];
   TECNICOS = TECNICOS_DATA.map(t => t.nombre);
   ACCIONES = {};
+  ACCIONES_PIEZA = new Set();
   (cats || []).forEach(c => {
     if (!ACCIONES[c.categoria]) ACCIONES[c.categoria] = [];
     ACCIONES[c.categoria].push(c.accion);
+    if (c.pregunta_pieza) ACCIONES_PIEZA.add(c.accion);
   });
   TODAS = Object.values(ACCIONES).flat();
 

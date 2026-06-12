@@ -740,10 +740,9 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
   }
 
   function elegir(acc) {
-    // Si es sugerencia, agregar directo sin preguntas de detalle
     const resSel = div.querySelector("[data-resseg='" + fid + "'] button.on")?.dataset.v;
     if (resSel !== "pendiente") {
-      if (/cambio|intercambio/i.test(acc)) {
+      if (ACCIONES_PIEZA.has(acc)) {
         mostrarOverlayCambio(acc, agregarAcc);
         return;
       }
