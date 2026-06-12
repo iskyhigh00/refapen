@@ -733,6 +733,43 @@ function renderFalla(f, acciones) {
     });
   }
 
+  // Botón de confirmar repuesto dudoso — solo visible al técnico dueño o Obrist
+  div.querySelectorAll("[data-accid]").forEach(el => {
+    const acc = acciones.find(a => String(a.id) === el.dataset.accid);
+    if (!acc || !acc.accion.includes("(usada - dudosa)")) return;
+    if (acc.tecnico !== tecnico && !isObrist) return;
+    const rb = document.createElement("button");
+    rb.className = "btn btn-sm";
+    rb.style.cssText = "margin:6px 0 0;font-size:11px;padding:3px 10px;border:1px solid var(--warn);color:var(--warn);background:none;border-radius:6px";
+    rb.textContent = "❓ ¿Cómo era el repuesto?";
+    rb.onclick = async e => {
+      e.stopPropagation();
+      const ov = document.createElement("div");
+      ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px";
+      ov.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:320px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px">¿Cómo era el repuesto?</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">${esc(acc.accion.replace(" (usada - dudosa)", ""))}</div>
+        <button class="btn btn-ok" id="rbBueno" style="margin-top:0">✓ Era bueno</button>
+        <button class="btn btn-danger" id="rbMalo" style="margin-top:10px">✗ Era defectuoso</button>
+        <button class="btn btn-sec" id="rbCancel" style="margin-top:10px">Cancelar</button>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.onclick = ev => { if (ev.target === ov) ov.remove(); };
+      ov.querySelector("#rbCancel").onclick = () => ov.remove();
+      async function confirmarRepuesto(bueno) {
+        ov.remove();
+        const nuevoNombre = acc.accion.replace("(usada - dudosa)", bueno ? "(usada - probada)" : "(usada - defectuosa)");
+        await sb.from("acciones").update({ accion: nuevoNombre }).eq("id", acc.id);
+        audit("confirmar_repuesto", { id: acc.id, resultado: bueno ? "bueno" : "defectuoso" });
+        toast(bueno ? "Repuesto marcado como bueno" : "Repuesto marcado como defectuoso");
+        abrirMda(f.mda);
+      }
+      ov.querySelector("#rbBueno").onclick = () => confirmarRepuesto(true);
+      ov.querySelector("#rbMalo").onclick = () => confirmarRepuesto(false);
+    };
+    el.appendChild(rb);
+  });
+
   return div;
 }
 
