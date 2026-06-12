@@ -585,7 +585,7 @@ function renderFalla(f, acciones) {
 
   const accionesNoAnuladas = acciones.filter(a => !a.anulada);
   const pendientesDeProbar = accionesNoAnuladas.filter(a => a.resultado === "pendiente");
-  const accionesNormales = [...acciones].reverse().filter(a => a.resultado !== "pendiente");
+  const accionesNormales = accionesNoAnuladas.slice().reverse().filter(a => a.resultado !== "pendiente");
   const recientes = accionesNormales.slice(0, 3);
   const antiguas = accionesNormales.slice(3);
 
@@ -611,12 +611,17 @@ function renderFalla(f, acciones) {
     accHtml += `<div class="acc-antiguas hidden" data-antiguas="${f.id}">${antiguas.map(renderAccItem).join("")}</div>`;
   }
 
+  const anuladas = acciones.filter(a => a.anulada);
+  const anuladasHtml = isObrist && anuladas.length
+    ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Acciones anuladas (${anuladas.length})</summary>${anuladas.map(renderAccItem).join("")}</details>`
+    : "";
+
   div.innerHTML = `
     <h3 style="font-size:20px;margin-bottom:6px">${esc(f.falla)}</h3>
     <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
     <div class="sugerencias-box" data-sug="${f.id}"></div>
     ${pendientesHtml}
-    <div class="acciones-list">${accHtml || (pendientesDeProbar.length ? '' : '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>')}</div>
+    <div class="acciones-list">${accHtml || (pendientesDeProbar.length ? '' : '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>')}${anuladasHtml}</div>
     <div style="margin-top:10px">
       <div class="fotos-grid" data-fotos="${f.id}"></div>
       ${!cerrada ? `<label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">📷 Agregar foto<input type="file" accept="image/*" capture="environment" data-fotoinput="${f.id}" style="display:none"></label>` : ""}
