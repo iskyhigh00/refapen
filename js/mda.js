@@ -775,16 +775,22 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
     agregarAcc(acc);
   }
 
-  chips.innerHTML = "";
   const favs = TOP_ACCIONES.length ? TOP_ACCIONES : FAVS;
-  favs.forEach(a => {
-    if (!TODAS.includes(a)) return;
-    const c = document.createElement("button");
-    c.className = "chip fav";
-    c.textContent = a;
-    c.onclick = () => elegir(a);
-    chips.appendChild(c);
-  });
+
+  function pintarChips(filtro) {
+    chips.innerHTML = "";
+    const q = (filtro || "").toLowerCase().trim();
+    favs.forEach(a => {
+      if (!TODAS.includes(a)) return;
+      if (q && !a.toLowerCase().includes(q)) return;
+      const c = document.createElement("button");
+      c.className = "chip fav";
+      c.textContent = a;
+      c.onclick = () => elegir(a);
+      chips.appendChild(c);
+    });
+  }
+  pintarChips("");
 
   function pintarCats(filtro) {
     cats.innerHTML = "";
@@ -831,7 +837,7 @@ function initSelectorAcciones(div, fid, accionesExistentes) {
   }
 
   pintarCats("");
-  search.oninput = () => pintarCats(search.value);
+  search.oninput = () => { pintarChips(search.value); pintarCats(search.value); };
   elegirCallbacks[fid] = elegir;
 }
 
