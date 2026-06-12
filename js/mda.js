@@ -590,7 +590,10 @@ function renderFalla(f, acciones) {
   const antiguas = accionesNormales.slice(3);
 
   function renderAccItem(a) {
-    const resText = a.resultado === "resolvio" ? "resolvió" : a.resultado === "no_resolvio" ? "no resolvió" : "sugerencia pendiente";
+    const resText = a.accion === "⟲ Volvió a fallar" ? "reincidencia"
+      : a.resultado === "resolvio" ? "resolvió"
+      : a.resultado === "no_resolvio" ? "no resolvió"
+      : "sugerencia pendiente";
     const hist = a.historial_resultados
       ? `<div class="accion-hist">${esc(a.historial_resultados).split(" → ").map((h, i) => `<div>${i + 1}. ${h}</div>`).join("")}<div>${esc(a.historial_resultados).split(" → ").length + 1}. ${resText} (${a.tecnico} · ${fmtFecha(a.created_at)})</div></div>` : "";
     const clickable = (!a.anulada && a.resultado === "pendiente") ? `style="cursor:pointer" data-resolve="${a.id}" data-accion="${esc(a.accion)}"` : "";
@@ -856,15 +859,25 @@ async function addAccion(fallaId) {
   }
   const resLabel = { resolvio: "resolvió", no_resolvio: "no resolvió", pendiente: "sugerencia" };
   for (const txt of sel) {
-    const prev = existentes.find(a => a.accion === txt);
-    if (prev && navigator.onLine) {
-      const rastro = (prev.historial_resultados ? prev.historial_resultados + " → " : "") + `${resLabel[prev.resultado]} (${prev.tecnico} · ${fmtFecha(prev.created_at)})`;
-      const { error } = await sb.from("acciones").update({ resultado: res, tecnico: tecnico, created_at: ts, historial_resultados: rastro }).eq("id", prev.id);
-      if (error) { cola.push({ id: uid(), t: "accion", d: { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts } }); guardarCola(); }
-    } else {
-      const d = { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts };
-      if (navigator.onLine) { const { error } = await sb.from("acciones").insert(d); if (error) { cola.push({ id: uid(), t: "accion", d }); guardarCola(); } }
+    if (res === "pendiente") {
+      // Sugerencia: solo insertar si no existe ya una sugerencia pendiente idéntica
+      const yaExiste = existentes.find(a => a.accion === txt && a.resultado === "pendiente");
+      if (yaExiste) continue;
+      const d = { falla_id: fallaId, accion: txt, resultado: "pendiente", tecnico: tecnico, created_at: ts };
+      if (navigator.onLine) { await sb.from("acciones").insert(d); }
       else { cola.push({ id: uid(), t: "accion", d }); guardarCola(); }
+    } else {
+      // resolvio / no_resolvio: encadenar si existe registro previo para la misma acción
+      const prev = existentes.find(a => a.accion === txt);
+      if (prev && navigator.onLine) {
+        const rastro = (prev.historial_resultados ? prev.historial_resultados + " → " : "") + `${resLabel[prev.resultado]} (${prev.tecnico} · ${fmtFecha(prev.created_at)})`;
+        const { error } = await sb.from("acciones").update({ resultado: res, tecnico: tecnico, created_at: ts, historial_resultados: rastro }).eq("id", prev.id);
+        if (error) { cola.push({ id: uid(), t: "accion", d: { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts } }); guardarCola(); }
+      } else {
+        const d = { falla_id: fallaId, accion: txt, resultado: res, tecnico: tecnico, created_at: ts };
+        if (navigator.onLine) { const { error } = await sb.from("acciones").insert(d); if (error) { cola.push({ id: uid(), t: "accion", d }); guardarCola(); } }
+        else { cola.push({ id: uid(), t: "accion", d }); guardarCola(); }
+      }
     }
   }
 
@@ -891,7 +904,7 @@ async function addAccion(fallaId) {
   toast(nuevoEstado === "observacion" ? "Registrado · en observación" : "Registrado");
   await cargarMaestros();
   await cargarLista();
-  $("scrMda").classList.add("hidden");
+  abrirMda(mdaActual);
 }
 
 function resolverAccionPendiente(accionId, nombre, fallaId) {
@@ -966,7 +979,7 @@ function resolverAccionPendiente(accionId, nombre, fallaId) {
     audit("resolver_accion_pendiente", { accion_id: accionId, resultado: res, falla_id: fallaId });
     toast(nuevoEstado === "observacion" ? "Resuelto · en observación" : "Registrado");
     await cargarLista();
-    $("scrMda").classList.add("hidden");
+    abrirMda(mdaActual);
   }
 
   overlay.querySelector("#oRes").onclick = () => aplicar("resolvio");

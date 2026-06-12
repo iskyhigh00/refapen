@@ -221,7 +221,7 @@ async function volvioAFallar(fallaId) {
           resultado: "no_resolvio",
           tecnico,
           created_at: ts,
-          historial_resultados: `resolvió (${acc.tecnico} · ${fmtFecha(acc.created_at)}) → volvió a fallar`
+          historial_resultados: `resolvió (${acc.tecnico} · ${fmtFecha(acc.created_at)})`
         });
       }
     } else {
