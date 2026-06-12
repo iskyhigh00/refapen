@@ -214,9 +214,7 @@ async function volvioAFallar(fallaId) {
     const { data: accs } = await sb.from("acciones").select("*").eq("falla_id", fallaId).eq("resultado", "resolvio").eq("anulada", false).order("created_at", { ascending: false });
     if (accs && accs.length) {
       for (const acc of accs) {
-        // Anular cada acción que resolvió (queda tachada)
         await sb.from("acciones").update({ anulada: true }).eq("id", acc.id);
-        // Crear entrada "no resolvió" para cada una
         await sb.from("acciones").insert({
           falla_id: fallaId,
           accion: acc.accion,
@@ -226,6 +224,15 @@ async function volvioAFallar(fallaId) {
           historial_resultados: `resolvió (${acc.tecnico} · ${fmtFecha(acc.created_at)}) → volvió a fallar`
         });
       }
+    } else {
+      // Sin acciones previas: dejar igualmente registro de quién reportó que volvió a fallar
+      await sb.from("acciones").insert({
+        falla_id: fallaId,
+        accion: "⟲ Volvió a fallar",
+        resultado: "no_resolvio",
+        tecnico,
+        created_at: ts
+      });
     }
     await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: ts }).eq("id", fallaId);
   } else {
