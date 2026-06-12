@@ -72,6 +72,7 @@ async function editarFalla(f) {
   const box = document.createElement("div");
   box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:92vh;overflow-y:auto";
   const tecOpts = TECNICOS.map(t => `<option value="${esc(t)}"${t===f.tecnico?" selected":""}>${esc(t)}</option>`).join("");
+  const toLocal = iso => { const d = new Date(iso); const pad = n => String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   box.innerHTML = `
     <div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Editar falla</div>
     <label>Descripción</label>
@@ -88,6 +89,10 @@ async function editarFalla(f) {
     <input id="edMda" value="${esc(f.mda)}" inputmode="numeric" maxlength="6">
     <label>Isla</label>
     <input id="edIsla" value="${esc(f.isla)}">
+    <label>Fecha de creación</label>
+    <input type="datetime-local" id="edCreatedAt" value="${toLocal(f.created_at)}">
+    <label>Última actualización</label>
+    <input type="datetime-local" id="edUpdatedAt" value="${toLocal(f.updated_at)}">
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-ok" id="edGuardar" style="margin:0">Guardar</button>
       <button class="btn btn-sec" id="edCancelar" style="margin:0">Cancelar</button>
@@ -101,8 +106,10 @@ async function editarFalla(f) {
     const tecnicoVal = box.querySelector("#edTecnico").value;
     const mdaVal = mda6(box.querySelector("#edMda").value);
     const islaVal = box.querySelector("#edIsla").value.trim();
+    const createdAt = new Date(box.querySelector("#edCreatedAt").value).toISOString();
+    const updatedAt = new Date(box.querySelector("#edUpdatedAt").value).toISOString();
     if (!falla) { toast("La descripción no puede estar vacía"); return; }
-    const { error } = await sb.from("mdas_fallas").update({ falla, estado, tecnico: tecnicoVal, mda: mdaVal, isla: islaVal, updated_at: new Date().toISOString() }).eq("id", f.id);
+    const { error } = await sb.from("mdas_fallas").update({ falla, estado, tecnico: tecnicoVal, mda: mdaVal, isla: islaVal, created_at: createdAt, updated_at: updatedAt }).eq("id", f.id);
     if (error) { toast("Error: " + error.message); return; }
     audit("editar_falla", { id: f.id, falla, estado, mda: mdaVal });
     toast("Guardado");
@@ -118,6 +125,7 @@ async function editarAccion(a, mdaNum) {
   const box = document.createElement("div");
   box.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:380px";
   const tecOpts = TECNICOS.map(t => `<option value="${esc(t)}"${t===a.tecnico?" selected":""}>${esc(t)}</option>`).join("");
+  const toLocal = iso => { const d = new Date(iso); const pad = n => String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   box.innerHTML = `
     <div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Editar acción</div>
     <label>Texto</label>
@@ -130,6 +138,8 @@ async function editarAccion(a, mdaNum) {
     </select>
     <label>Técnico</label>
     <select id="eaTecnico">${tecOpts}</select>
+    <label>Fecha y hora</label>
+    <input type="datetime-local" id="eaCreatedAt" value="${toLocal(a.created_at)}">
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-ok" id="eaGuardar" style="margin:0">Guardar</button>
       <button class="btn btn-danger" id="eaAnular" style="margin:0">Anular</button>
@@ -142,8 +152,9 @@ async function editarAccion(a, mdaNum) {
     const accion = box.querySelector("#eaAccion").value.trim();
     const resultado = box.querySelector("#eaResultado").value;
     const tecnicoVal = box.querySelector("#eaTecnico").value;
+    const createdAt = new Date(box.querySelector("#eaCreatedAt").value).toISOString();
     if (!accion) { toast("El texto no puede estar vacío"); return; }
-    const { error } = await sb.from("acciones").update({ accion, resultado, tecnico: tecnicoVal }).eq("id", a.id);
+    const { error } = await sb.from("acciones").update({ accion, resultado, tecnico: tecnicoVal, created_at: createdAt }).eq("id", a.id);
     if (error) { toast("Error: " + error.message); return; }
     audit("editar_accion", { id: a.id, accion, resultado });
     toast("Guardado"); ov.remove(); abrirMda(mdaNum);
