@@ -205,42 +205,94 @@ async function cambiarEstadoPortada(fallaId, estado) {
   cargarLista();
 }
 
-async function volvioAFallar(fallaId) {
-  if (!await confirmar("¿Volvió a fallar?", { ok: "Sí, volvió", danger: true })) return;
-  const ts = new Date().toISOString();
+function volvioAFallar(fallaId) {
+  const OPCIONES = [
+    { label: "15 min",  ms: 15 * 60000 },
+    { label: "30 min",  ms: 30 * 60000 },
+    { label: "1 hora",  ms: 3600000 },
+    { label: "2 horas", ms: 2 * 3600000 },
+    { label: "3 horas", ms: 3 * 3600000 },
+    { label: "6 horas", ms: 6 * 3600000 },
+    { label: "12 horas",ms: 12 * 3600000 },
+    { label: "1 día",   ms: 24 * 3600000 },
+  ];
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const nowStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-  if (navigator.onLine) {
-    // Buscar todas las acciones que "resolvieron" (no solo la última)
-    const { data: accs } = await sb.from("acciones").select("*").eq("falla_id", fallaId).eq("resultado", "resolvio").eq("anulada", false).order("created_at", { ascending: false });
-    if (accs && accs.length) {
-      for (const acc of accs) {
-        await sb.from("acciones").update({ anulada: true }).eq("id", acc.id);
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px";
+  ov.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:380px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">⟲ Volvió a fallar</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">¿Cuándo empezó a fallar de nuevo?</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="vfOpts"></div>
+    <input type="datetime-local" id="vfCustom" value="${nowStr}" style="margin-bottom:8px">
+    <button class="btn btn-sec btn-sm" id="vfCustomOk" style="margin:0">Usar esta fecha</button>
+    <div id="vfTsLabel" style="font-size:12px;color:var(--warn);margin-top:8px;min-height:16px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-danger" id="vfOk" style="margin:0">Confirmar</button>
+      <button class="btn btn-sec" id="vfCancel" style="margin:0">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelector("#vfCancel").onclick = () => ov.remove();
+
+  let tsElegido = null;
+
+  OPCIONES.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "btn btn-sec btn-sm"; b.style.margin = "0";
+    b.textContent = `Hace ${o.label}`;
+    b.onclick = () => {
+      tsElegido = new Date(Date.now() - o.ms).toISOString();
+      ov.querySelector("#vfTsLabel").textContent = `Ocurrió hace ${o.label}`;
+    };
+    ov.querySelector("#vfOpts").appendChild(b);
+  });
+
+  ov.querySelector("#vfCustomOk").onclick = () => {
+    const val = ov.querySelector("#vfCustom").value;
+    if (!val) return;
+    const fecha = new Date(val);
+    if (isNaN(fecha) || fecha > new Date()) { toast("Fecha inválida o en el futuro"); return; }
+    tsElegido = fecha.toISOString();
+    ov.querySelector("#vfTsLabel").textContent = `Ocurrió: ${fmtFecha(tsElegido)}`;
+  };
+
+  ov.querySelector("#vfOk").onclick = async () => {
+    ov.remove();
+    const ts = tsElegido || new Date().toISOString();
+    if (navigator.onLine) {
+      const { data: accs } = await sb.from("acciones").select("*").eq("falla_id", fallaId).eq("resultado", "resolvio").eq("anulada", false).order("created_at", { ascending: false });
+      if (accs && accs.length) {
+        for (const acc of accs) {
+          await sb.from("acciones").update({ anulada: true }).eq("id", acc.id);
+          await sb.from("acciones").insert({
+            falla_id: fallaId,
+            accion: acc.accion,
+            resultado: "no_resolvio",
+            tecnico,
+            created_at: ts,
+            historial_resultados: `resolvió (${acc.tecnico} · ${fmtFecha(acc.created_at)})`
+          });
+        }
+      } else {
         await sb.from("acciones").insert({
           falla_id: fallaId,
-          accion: acc.accion,
+          accion: "⟲ Volvió a fallar",
           resultado: "no_resolvio",
           tecnico,
-          created_at: ts,
-          historial_resultados: `resolvió (${acc.tecnico} · ${fmtFecha(acc.created_at)})`
+          created_at: ts
         });
       }
+      await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: ts }).eq("id", fallaId);
     } else {
-      // Sin acciones previas: dejar igualmente registro de quién reportó que volvió a fallar
-      await sb.from("acciones").insert({
-        falla_id: fallaId,
-        accion: "⟲ Volvió a fallar",
-        resultado: "no_resolvio",
-        tecnico,
-        created_at: ts
-      });
+      cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: "pendiente" } });
+      guardarCola();
     }
-    await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: ts }).eq("id", fallaId);
-  } else {
-    cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: "pendiente" } });
-    guardarCola();
-  }
-
-  audit("volvio_a_fallar", { falla_id: fallaId });
-  toast("Volvió a pendiente");
-  cargarLista();
+    audit("volvio_a_fallar", { falla_id: fallaId });
+    toast("Volvió a pendiente");
+    cargarLista();
+  };
 }
