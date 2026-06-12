@@ -154,7 +154,7 @@ async function editarAccion(a, mdaNum) {
     const tecnicoVal = box.querySelector("#eaTecnico").value;
     const createdAt = new Date(box.querySelector("#eaCreatedAt").value).toISOString();
     if (!accion) { toast("El texto no puede estar vacío"); return; }
-    const { error } = await sb.from("acciones").update({ accion, resultado, tecnico: tecnicoVal, created_at: createdAt }).eq("id", a.id);
+    const { error } = await sb.from("acciones").update({ accion, resultado, tecnico: tecnicoVal, created_at: createdAt, anulada: false }).eq("id", a.id);
     if (error) { toast("Error: " + error.message); return; }
     audit("editar_accion", { id: a.id, accion, resultado });
     toast("Guardado"); ov.remove(); abrirMda(mdaNum);
