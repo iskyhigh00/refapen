@@ -345,7 +345,7 @@ async function abrirDeshacer() {
   function render() {
     box.innerHTML = `
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">↩ Deshacer</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Seleccioná las acciones a deshacer. El historial de auditoría se mantiene.</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Selecciona las acciones a deshacer. Se borran por completo, sin dejar registro.</div>
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-sec btn-sm" id="undoUlt1" style="margin:0">Última</button>
         <button class="btn btn-sec btn-sm" id="undoUlt3" style="margin:0">Últimas 3</button>
@@ -388,9 +388,8 @@ async function abrirDeshacer() {
     box.querySelector("#undoOk").onclick = async () => {
       if (!sel.size) return;
       const n = sel.size;
-      if (!await confirmar(`¿Deshacer ${n} acción${n>1?"es":""}? El historial de auditoría se mantiene.`, { ok: "Deshacer", danger: true })) return;
-      for (const id of sel) await sb.from("acciones").update({ anulada: true }).eq("id", id);
-      audit("deshacer_acciones", { ids: [...sel], cantidad: n });
+      if (!await confirmar(`¿Deshacer ${n} acción${n>1?"es":""}? Se borrarán por completo sin dejar registro.`, { ok: "Deshacer", danger: true })) return;
+      for (const id of sel) await sb.from("acciones").delete().eq("id", id);
       ov.remove();
       toast(`${n} acción${n>1?"es":""} deshecha${n>1?"s":""}`);
       cargarLista();
