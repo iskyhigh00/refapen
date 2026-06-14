@@ -228,4 +228,25 @@ async function cargarAdmin() {
     audit("agregar_accion_catalogo", { accion: acc, categoria: cat });
     $("nuevaAcc").value = ""; cargarAdmin(); cargarMaestros();
   };
+
+  // CONFIGURACIÓN GENERAL
+  const secCfg = document.createElement("div");
+  secCfg.className = "admin-section";
+  const minutosDeshacer = getCfg("minutos_deshacer", 30);
+  secCfg.innerHTML = `
+    <h3>Configuración</h3>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <label style="margin:0;font-size:14px">Ventana de deshacer (minutos):</label>
+      <input id="cfgDeshacer" type="number" min="5" max="1440" value="${minutosDeshacer}" style="width:80px;margin:0">
+      <button class="btn btn-ok btn-sm" id="btnGuardarCfg" style="margin:0">Guardar</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Tiempo máximo hacia atrás que un técnico puede deshacer sus acciones. Actualmente: ${minutosDeshacer} min.</div>`;
+  body.appendChild(secCfg);
+  $("btnGuardarCfg").onclick = () => {
+    const v = parseInt($("cfgDeshacer").value);
+    if (!v || v < 1) { toast("Valor inválido"); return; }
+    setCfg("minutos_deshacer", v);
+    toast(`Ventana de deshacer: ${v} min`);
+    cargarAdmin();
+  };
 }

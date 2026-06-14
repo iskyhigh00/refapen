@@ -325,16 +325,19 @@ async function abrirDeshacer() {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
   box.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0">Cargando…</p>';
 
+  const minutos = getCfg("minutos_deshacer", 30);
+  const desde = new Date(Date.now() - minutos * 60000).toISOString();
   const { data: accs } = await sb.from("acciones")
     .select("*, mdas_fallas(mda, falla)")
     .eq("tecnico", tecnico)
     .eq("anulada", false)
+    .gte("created_at", desde)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(50);
 
   if (!accs?.length) {
     box.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:12px">↩ Deshacer</div>
-      <p style="color:var(--muted);font-size:13px">No hay acciones recientes tuyas para deshacer.</p>
+      <p style="color:var(--muted);font-size:13px">No hay acciones tuyas en los últimos ${minutos} min para deshacer.</p>
       <button class="btn btn-sec" style="margin-top:16px">Cerrar</button>`;
     box.querySelector("button").onclick = () => ov.remove();
     return;
@@ -345,7 +348,7 @@ async function abrirDeshacer() {
   function render() {
     box.innerHTML = `
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">↩ Deshacer</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Selecciona las acciones a deshacer. Se borran por completo, sin dejar registro.</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Selecciona las acciones a deshacer. Se borran sin dejar registro. Solo se muestran las de los últimos ${minutos} min.</div>
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-sec btn-sm" id="undoUlt1" style="margin:0">Última</button>
         <button class="btn btn-sec btn-sm" id="undoUlt3" style="margin:0">Últimas 3</button>
