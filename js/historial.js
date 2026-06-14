@@ -27,7 +27,7 @@ async function cargarHistorial() {
     card.innerHTML = `
       <div class="mda-head" style="cursor:pointer"><div><span class="mda-id">MDA ${f.mda}</span> <span class="mda-isla">isla ${f.isla}</span></div><span class="falla-age">${fmtFecha(f.updated_at)}</span></div>
       <div style="margin-top:8px;font-size:14px">${esc(f.falla)}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">Resuelta por ${esc(f.tecnico)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Inició: ${fmtFecha(f.inicio_at || f.created_at)} · Resuelta por ${esc(f.tecnico)}</div>
       <button class="volvio-btn" data-volvio="${f.id}" style="margin-left:0;width:100%;margin-top:10px">⟲ Volvió a fallar</button>`;
     card.querySelector("[data-volvio='" + f.id + "']").onclick = async () => {
       if (!await confirmar("¿Volvió a fallar? La falla se reabrirá como pendiente.", { ok: "Sí, volvió a fallar", danger: true })) return;

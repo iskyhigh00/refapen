@@ -172,9 +172,10 @@ $("guardarFalla").onclick = async () => {
   if (!p.ok) { toast("Isla inválida"); return; }
   if (!falla) { toast("Falta la falla"); return; }
   const isla = p.valor;
-  const ts = accTime["_nueva"] || new Date().toISOString();
+  const inicio_at = accTime["_nueva"] || new Date().toISOString();
+  const now = new Date().toISOString();
   accTime["_nueva"] = null;
-  const d = { mda, isla, falla, estado: "pendiente", tecnico, created_at: ts, updated_at: ts };
+  const d = { mda, isla, falla, estado: "pendiente", tecnico, inicio_at, created_at: now, updated_at: now };
   if (navigator.onLine) {
     const { error } = await sb.from("mdas_fallas").insert(d);
     if (error) { cola.push({ id: uid(), t: "falla", d }); guardarCola(); }

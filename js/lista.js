@@ -167,7 +167,7 @@ async function cargarLista() {
           <span class="falla-txt">${esc(f.falla)}</span>
           <span class="falla-age">${ageTxt(d)}</span>
         </div>
-        <div class="ult-accion">Creada: ${fmtFecha(f.created_at)}${estadoTiempo ? " · " + estadoTiempo : ""}</div>
+        <div class="ult-accion">Inicio: ${fmtFecha(f.inicio_at || f.created_at)}${estadoTiempo ? " · " + estadoTiempo : ""}</div>
         ${acc ? `<div class="ult-accion">Última: ${esc(acc.accion)} · ${acc.resultado === "resolvio" ? "resolvió" : acc.resultado === "no_resolvio" ? "no resolvió" : "pendiente"}</div>` : `<div class="ult-accion">Sin acciones aún</div>`}
         <div class="est-seg" data-est="${f.id}">
           <button data-e="pendiente" class="${f.estado === 'pendiente' ? 'on' : ''}">Pendiente</button>

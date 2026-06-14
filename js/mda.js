@@ -89,8 +89,8 @@ async function editarFalla(f) {
     <input id="edMda" value="${esc(f.mda)}" inputmode="numeric" maxlength="6">
     <label>Isla</label>
     <input id="edIsla" value="${esc(f.isla)}">
-    <label>Fecha de creación</label>
-    <input type="datetime-local" id="edCreatedAt" value="${toLocal(f.created_at)}">
+    <label>Inicio de la falla</label>
+    <input type="datetime-local" id="edInicioAt" value="${toLocal(f.inicio_at || f.created_at)}">
     <label>Última actualización</label>
     <input type="datetime-local" id="edUpdatedAt" value="${toLocal(f.updated_at)}">
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -106,10 +106,10 @@ async function editarFalla(f) {
     const tecnicoVal = box.querySelector("#edTecnico").value;
     const mdaVal = mda6(box.querySelector("#edMda").value);
     const islaVal = box.querySelector("#edIsla").value.trim();
-    const createdAt = new Date(box.querySelector("#edCreatedAt").value).toISOString();
+    const inicioAt = new Date(box.querySelector("#edInicioAt").value).toISOString();
     const updatedAt = new Date(box.querySelector("#edUpdatedAt").value).toISOString();
     if (!falla) { toast("La descripción no puede estar vacía"); return; }
-    const { error } = await sb.from("mdas_fallas").update({ falla, estado, tecnico: tecnicoVal, mda: mdaVal, isla: islaVal, created_at: createdAt, updated_at: updatedAt }).eq("id", f.id);
+    const { error } = await sb.from("mdas_fallas").update({ falla, estado, tecnico: tecnicoVal, mda: mdaVal, isla: islaVal, inicio_at: inicioAt, updated_at: updatedAt }).eq("id", f.id);
     if (error) { toast("Error: " + error.message); return; }
     audit("editar_falla", { id: f.id, falla, estado, mda: mdaVal });
     toast("Guardado");
@@ -503,7 +503,8 @@ function exportarInformeFalla(f, acciones) {
       <dt>MDA</dt><dd>${f.mda}</dd>
       <dt>Isla</dt><dd>${f.isla}</dd>
       <dt>Técnico que reportó</dt><dd>${esc(f.tecnico)}</dd>
-      <dt>Fecha de creación</dt><dd>${fmtFecha(f.created_at)}</dd>
+      <dt>Inicio de la falla</dt><dd>${fmtFecha(f.inicio_at || f.created_at)}</dd>
+      <dt>Registrada en el sistema</dt><dd>${fmtFecha(f.created_at)}</dd>
       <dt>Última actualización</dt><dd>${fmtFecha(f.updated_at)}</dd>
     </dl>
   </div>
@@ -626,7 +627,7 @@ async function abrirMda(mdaNum) {
         }).join("");
         card.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-            <div><b style="font-size:14px">${esc(f.falla)}</b><div style="font-size:11px;color:var(--muted)">${f.tecnico} · ${fmtFecha(f.created_at)}</div></div>
+            <div><b style="font-size:14px">${esc(f.falla)}</b><div style="font-size:11px;color:var(--muted)">${f.tecnico} · ${fmtFecha(f.inicio_at || f.created_at)}</div></div>
             <span class="estado-tag estado-resuelta" style="font-size:10px">Resuelta</span>
           </div>
           ${accsHtml || '<div style="font-size:12px;color:var(--muted)">Sin acciones registradas</div>'}
@@ -714,7 +715,7 @@ function renderFalla(f, acciones) {
 
   div.innerHTML = `
     <h3 style="font-size:20px;margin-bottom:6px">${esc(f.falla)}</h3>
-    <div class="meta">${f.tecnico} · ${fmtFecha(f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
+    <div class="meta">${f.tecnico} · ${fmtFecha(f.inicio_at || f.created_at)} · <span class="estado-tag estado-${f.estado}">${estLabel}</span>${!cerrada ? ` · <span style="font-size:11px;color:${f.estado === 'observacion' ? 'var(--accent)' : 'var(--warn)'}">${f.estado === 'observacion' ? 'en obs.' : 'pendiente'} hace ${tiempoDesde(f.updated_at)}</span>` : ""}</div>
     <div class="sugerencias-box" data-sug="${f.id}"></div>
     ${pendientesHtml}
     <div class="acciones-list">${accHtml || (pendientesDeProbar.length ? '' : '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>')}${anuladasHtml}</div>
