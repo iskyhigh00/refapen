@@ -286,7 +286,7 @@ function volvioAFallar(fallaId) {
           created_at: ts
         });
       }
-      await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: ts }).eq("id", fallaId);
+      await sb.from("mdas_fallas").update({ estado: "pendiente", updated_at: new Date().toISOString() }).eq("id", fallaId);
     } else {
       cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: "pendiente" } });
       guardarCola();

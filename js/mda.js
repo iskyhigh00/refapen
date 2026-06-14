@@ -1032,7 +1032,7 @@ async function addAccion(fallaId) {
   let nuevoEstado = null;
   if (res === "resolvio") nuevoEstado = "observacion";
   else if (res === "no_resolvio") nuevoEstado = "pendiente";
-  const upd = { updated_at: ts };
+  const upd = { updated_at: new Date().toISOString() };
   if (nuevoEstado) upd.estado = nuevoEstado;
   if (navigator.onLine) { await sb.from("mdas_fallas").update(upd).eq("id", fallaId); }
   else if (nuevoEstado) { cola.push({ id: uid(), t: "estado", d: { id: fallaId, estado: nuevoEstado } }); guardarCola(); }
@@ -1123,7 +1123,7 @@ function resolverAccionPendiente(accionId, nombre, fallaId) {
     const rastro = (orig?.historial_resultados ? orig.historial_resultados + " → " : "") + `${resLabelOrig[orig?.resultado] || "sugerencia"} (${orig?.tecnico} · ${fmtFecha(orig?.created_at)})`;
     await sb.from("acciones").update({ resultado: res, tecnico, created_at: ts, historial_resultados: rastro }).eq("id", accionId);
     let nuevoEstado = res === "resolvio" ? "observacion" : res === "no_resolvio" ? "pendiente" : null;
-    if (nuevoEstado) await sb.from("mdas_fallas").update({ estado: nuevoEstado, updated_at: ts }).eq("id", fallaId);
+    if (nuevoEstado) await sb.from("mdas_fallas").update({ estado: nuevoEstado, updated_at: new Date().toISOString() }).eq("id", fallaId);
     audit("resolver_accion_pendiente", { accion_id: accionId, resultado: res, falla_id: fallaId });
     toast(nuevoEstado === "observacion" ? "Resuelto · en observación" : "Registrado");
     await cargarLista();
