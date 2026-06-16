@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div id="appVersion" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#888;z-index:9999;pointer-events:none">v3.5</div>
+<div id="appVersion" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#888;z-index:9999;pointer-events:none">v3.6</div>
 
 <div id="login" class="login">
   <h2>Fallas MDA</h2>
@@ -57,7 +57,7 @@
     <label>Descripción de la falla</label>
     <textarea id="nFalla" placeholder="pérdida de imagen en pantalla superior"></textarea>
     <label style="font-weight:400;color:var(--muted);font-size:13px">Fotos (opcional)</label>
-    <label class="btn btn-sec" style="cursor:pointer;display:inline-block;margin-bottom:8px">📷 Agregar foto<input type="file" id="nFotos" accept="image/*" capture="environment" multiple style="display:none"></label>
+    <label class="btn btn-sec" style="cursor:pointer;display:inline-block;margin-bottom:8px">📷 Agregar foto<input type="file" id="nFotos" accept="image/*" multiple style="display:none"></label>
     <div id="nFotosPreview" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <button class="btn" id="guardarFalla" disabled>Crear falla</button>
     <div style="margin-top:10px">

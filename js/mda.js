@@ -721,7 +721,7 @@ function renderFalla(f, acciones) {
     <div class="acciones-list">${accHtml || (pendientesDeProbar.length ? '' : '<p style="color:var(--muted);font-size:13px">Sin acciones aún.</p>')}${anuladasHtml}</div>
     <div style="margin-top:10px">
       <div class="fotos-grid" data-fotos="${f.id}"></div>
-      ${!cerrada ? `<label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">📷 Agregar foto<input type="file" accept="image/*" capture="environment" data-fotoinput="${f.id}" style="display:none"></label>` : ""}
+      ${!cerrada ? `<label class="btn btn-sec btn-sm" style="margin-top:8px;cursor:pointer;display:inline-block">📷 Agregar foto<input type="file" accept="image/*" data-fotoinput="${f.id}" style="display:none"></label>` : ""}
     </div>
     ${cerrada ? "" : `
     <div class="add-accion">
